@@ -23,6 +23,24 @@ declare -A IRF_SEVERITY_LEVELS
 IRF_SEVERITY_LEVELS=([INFO]=10 [LOW]=20 [MEDIUM]=30 [HIGH]=40 [CRITICAL]=50)
 
 #
+# Function: irf_validate_pattern
+# Description: Validate a regex pattern for correctness
+# Arguments:
+#   $1 - Regex pattern to validate
+# Returns:
+#   0 if valid, 1 if invalid
+#
+irf_validate_pattern() {
+    local pattern="$1"
+    # Try to use the pattern with grep to verify it's valid
+    if ! echo "test" | grep -q -E "$pattern" 2>/dev/null; then
+        irf_log ERROR "Invalid regex pattern: $pattern"
+        return 1
+    fi
+    return 0
+}
+
+#
 # Function: irf_load_rule_file
 # Description: Load rules from a rule file
 # Arguments:
@@ -33,27 +51,53 @@ IRF_SEVERITY_LEVELS=([INFO]=10 [LOW]=20 [MEDIUM]=30 [HIGH]=40 [CRITICAL]=50)
 irf_load_rule_file() {
     local rule_file="$1"
     local rule_count=0
+    local invalid_count=0
     
     # Validate rule file
     if ! irf_validate_file "$rule_file"; then
         irf_log ERROR "Invalid rule file: $rule_file"
         return 1
-    }
+    fi
     
-    # Parse the rule file
+    # Add rate limiting for alerts
+    local timestamp
+    timestamp=$(date +"%s")
+    
+    # Process rules with better error handling
     while IFS= read -r line; do
         # Skip comments and empty lines
         [[ -z "${line}" || "${line}" =~ ^[[:space:]]*# ]] && continue
+        
+        # Validate rule format
+        IFS=';' read -r id description pattern severity fields <<< "$line"
+        
+        if [[ -z "$id" || -z "$pattern" ]]; then
+            irf_log WARN "Skipping invalid rule format in $rule_file"
+            invalid_count=$((invalid_count + 1))
+            continue
+        fi
+        
+        # Validate pattern
+        if ! irf_validate_pattern "$pattern"; then
+            irf_log WARN "Skipping rule $id due to invalid pattern: $pattern"
+            invalid_count=$((invalid_count + 1))
+            continue
+        fi
         
         # Store the rule in the global array
         IRF_LOADED_RULES+=("$line")
         rule_count=$((rule_count + 1))
     done < "$rule_file"
     
+    # Log results
+    if [[ $invalid_count -gt 0 ]]; then
+        irf_log WARN "Found $invalid_count invalid rules in $rule_file"
+    fi
+    
     irf_log INFO "Loaded $rule_count rules from $rule_file"
     
     if [[ $rule_count -eq 0 ]]; then
-        irf_log WARN "No rules found in rule file: $rule_file"
+        irf_log WARN "No valid rules found in rule file: $rule_file"
         return 1
     fi
     

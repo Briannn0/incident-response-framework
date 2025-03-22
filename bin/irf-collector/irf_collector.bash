@@ -27,6 +27,52 @@ source "${IRF_ROOT}/lib/bash/collector.sh" || {
 OUTPUT_DIR="${IRF_EVIDENCE_DIR:-${IRF_ROOT}/evidence}/collected"
 SPECIFIC_SOURCE=""
 
+# Add input validation function
+validate_arguments() {
+    local source_name="$1"
+    local output_dir="$2"
+    
+    # Validate source name if provided
+    if [[ -n "$source_name" ]]; then
+        if [[ "$source_name" =~ [^a-zA-Z0-9_-] ]]; then
+            irf_log ERROR "Invalid source name: $source_name (only alphanumeric, hyphen, underscore allowed)"
+            return 1
+        fi
+    fi
+    
+    # Validate output directory
+    if [[ -n "$output_dir" ]]; then
+        if [[ "$output_dir" == *".."* || "$output_dir" == *"~"* ]]; then
+            irf_log ERROR "Invalid output directory path: $output_dir"
+            return 1
+        fi
+    fi
+    
+    return 0
+}
+
+# Add resource monitoring
+monitor_resources() {
+    # Get current process ID
+    local pid=$$
+    
+    # Check CPU usage
+    local cpu_usage
+    cpu_usage=$(ps -p "$pid" -o %cpu | tail -n 1 | tr -d ' ')
+    
+    if (( $(echo "$cpu_usage > 80.0" | bc -l) )); then
+        irf_log WARN "High CPU usage detected: ${cpu_usage}%"
+    fi
+    
+    # Check memory usage
+    local mem_usage
+    mem_usage=$(ps -p "$pid" -o %mem | tail -n 1 | tr -d ' ')
+    
+    if (( $(echo "$mem_usage > 70.0" | bc -l) )); then
+        irf_log WARN "High memory usage detected: ${mem_usage}%"
+    fi
+}
+
 # Display usage information
 show_usage() {
     cat << EOF
@@ -99,6 +145,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Validate arguments
+if ! validate_arguments "$SPECIFIC_SOURCE" "$OUTPUT_DIR"; then
+    exit 1
+fi
+
 # Create output directory if it doesn't exist
 if [[ ! -d "$OUTPUT_DIR" ]]; then
     mkdir -p "$OUTPUT_DIR" || {
@@ -106,6 +157,18 @@ if [[ ! -d "$OUTPUT_DIR" ]]; then
         exit 1
     }
 fi
+
+# Add periodic resource monitoring during collection
+(
+    while true; do
+        sleep 60
+        monitor_resources
+    done
+) &
+MONITOR_PID=$!
+
+# Cleanup on exit
+trap 'kill $MONITOR_PID 2>/dev/null || true' EXIT
 
 # Collect logs
 irf_log INFO "Starting log collection..."

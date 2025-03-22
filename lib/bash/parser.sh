@@ -30,6 +30,20 @@ IRF_FIELDS=(
 )
 
 #
+# Function: irf_sanitize_log_line
+# Description: Sanitizes log lines by removing control characters and null bytes
+# Arguments:
+#   $1 - Log line to sanitize
+# Returns:
+#   Sanitized log line to stdout
+#
+irf_sanitize_log_line() {
+    local line="$1"
+    # Remove control characters and null bytes
+    echo "$line" | tr -d '\000-\037\177'
+}
+
+#
 # Function: irf_parse_log_line
 # Description: Parse a single log line based on the specified format
 # Arguments:
@@ -43,9 +57,12 @@ irf_parse_log_line() {
     local log_line="$1"
     local log_format="$2"
     local log_type="$3"
-    local parsed_fields=()
     
-    # Initialize fields to empty values
+    # Sanitize log line
+    log_line=$(irf_sanitize_log_line "$log_line")
+    
+    # Initialize fields with explicit declaration
+    declare -A parsed_fields
     for field in "${IRF_FIELDS[@]}"; do
         parsed_fields["$field"]=""
     done
@@ -53,107 +70,115 @@ irf_parse_log_line() {
     # Set source_type to the log type
     parsed_fields["source_type"]="$log_type"
     
-    # Parse based on format
-    case "$log_format" in
-        syslog)
-            # Extract timestamp (standard syslog format)
-            if [[ "$log_line" =~ ^([A-Za-z]+[[:space:]]+[0-9]+[[:space:]]+[0-9:]+)[[:space:]]+(.*) ]]; then
-                parsed_fields["timestamp"]="${BASH_REMATCH[1]}"
-                log_line="${BASH_REMATCH[2]}"
-            fi
+    # Try-catch style error handling for parsing
+    {
+        # Parse based on format
+        case "$log_format" in
+            syslog)
+                # Extract timestamp (standard syslog format)
+                if [[ "$log_line" =~ ^([A-Za-z]+[[:space:]]+[0-9]+[[:space:]]+[0-9:]+)[[:space:]]+(.*) ]]; then
+                    parsed_fields["timestamp"]="${BASH_REMATCH[1]}"
+                    log_line="${BASH_REMATCH[2]}"
+                fi
+                
+                # Extract hostname if present
+                if [[ "$log_line" =~ ^([^[:space:]]+)[[:space:]]+(.*) ]]; then
+                    parsed_fields["hostname"]="${BASH_REMATCH[1]}"
+                    log_line="${BASH_REMATCH[2]}"
+                fi
+                
+                # Extract service/process (e.g. sshd, sudo, etc.)
+                if [[ "$log_line" =~ ^([^:[:space:]]+)(\[[0-9]+\])?:[[:space:]]+(.*) ]]; then
+                    parsed_fields["service"]="${BASH_REMATCH[1]}"
+                    log_line="${BASH_REMATCH[3]}"
+                fi
+                
+                # Extract process ID if present
+                if [[ "$log_line" =~ \[([0-9]+)\] ]]; then
+                    parsed_fields["process_id"]="${BASH_REMATCH[1]}"
+                fi
+                
+                # Extract IP address if present (this is a simplified pattern)
+                if [[ "$log_line" =~ ([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}) ]]; then
+                    parsed_fields["ip_address"]="${BASH_REMATCH[1]}"
+                fi
+                
+                # Extract username if present
+                if [[ "$log_line" =~ user[[:space:]]*[=:]?[[:space:]]*([^[:space:]]+) ]]; then
+                    parsed_fields["username"]="${BASH_REMATCH[1]}"
+                elif [[ "$log_line" =~ for[[:space:]]user[[:space:]]([^[:space:]]+) ]]; then
+                    parsed_fields["username"]="${BASH_REMATCH[1]}"
+                fi
+                
+                # The remaining part is the message
+                parsed_fields["message"]="$log_line"
+                ;;
             
-            # Extract hostname if present
-            if [[ "$log_line" =~ ^([^[:space:]]+)[[:space:]]+(.*) ]]; then
-                parsed_fields["hostname"]="${BASH_REMATCH[1]}"
-                log_line="${BASH_REMATCH[2]}"
-            fi
+            json)
+                # Use jq if available, otherwise basic parsing with grep
+                if command -v jq &>/dev/null; then
+                    # Parse with jq and extract known fields
+                    # This assumes the JSON structure matches our field names
+                    for field in "${IRF_FIELDS[@]}"; do
+                        local value
+                        value=$(echo "$log_line" | jq -r ".$field // empty" 2>/dev/null)
+                        if [[ -n "$value" && "$value" != "null" ]]; then
+                            parsed_fields["$field"]="$value"
+                        fi
+                    done
+                else
+                    # Fallback basic parsing for JSON logs
+                    for field in "${IRF_FIELDS[@]}"; do
+                        if [[ "$log_line" =~ \"$field\":\"([^\"]+)\" ]]; then
+                            parsed_fields["$field"]="${BASH_REMATCH[1]}"
+                        fi
+                    done
+                fi
+                ;;
             
-            # Extract service/process (e.g. sshd, sudo, etc.)
-            if [[ "$log_line" =~ ^([^:[:space:]]+)(\[[0-9]+\])?:[[:space:]]+(.*) ]]; then
-                parsed_fields["service"]="${BASH_REMATCH[1]}"
-                log_line="${BASH_REMATCH[3]}"
-            fi
+            custom)
+                # For custom format, we rely on regex patterns defined in the log source config
+                if [[ -n "${TIMESTAMP_REGEX:-}" && "$log_line" =~ $TIMESTAMP_REGEX ]]; then
+                    parsed_fields["timestamp"]="${BASH_REMATCH[1]}"
+                fi
+                
+                if [[ -n "${USERNAME_REGEX:-}" && "$log_line" =~ $USERNAME_REGEX ]]; then
+                    parsed_fields["username"]="${BASH_REMATCH[1]}"
+                fi
+                
+                if [[ -n "${IP_ADDRESS_REGEX:-}" && "$log_line" =~ $IP_ADDRESS_REGEX ]]; then
+                    parsed_fields["ip_address"]="${BASH_REMATCH[1]}"
+                fi
+                
+                if [[ -n "${HOSTNAME_REGEX:-}" && "$log_line" =~ $HOSTNAME_REGEX ]]; then
+                    parsed_fields["hostname"]="${BASH_REMATCH[1]}"
+                fi
+                
+                if [[ -n "${SERVICE_REGEX:-}" && "$log_line" =~ $SERVICE_REGEX ]]; then
+                    parsed_fields["service"]="${BASH_REMATCH[1]}"
+                fi
+                
+                # The original message is kept intact
+                parsed_fields["message"]="$log_line"
+                ;;
             
-            # Extract process ID if present
-            if [[ "$log_line" =~ \[([0-9]+)\] ]]; then
-                parsed_fields["process_id"]="${BASH_REMATCH[1]}"
-            fi
-            
-            # Extract IP address if present (this is a simplified pattern)
-            if [[ "$log_line" =~ ([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}) ]]; then
-                parsed_fields["ip_address"]="${BASH_REMATCH[1]}"
-            fi
-            
-            # Extract username if present
-            if [[ "$log_line" =~ user[[:space:]]*[=:]?[[:space:]]*([^[:space:]]+) ]]; then
-                parsed_fields["username"]="${BASH_REMATCH[1]}"
-            elif [[ "$log_line" =~ for[[:space:]]user[[:space:]]([^[:space:]]+) ]]; then
-                parsed_fields["username"]="${BASH_REMATCH[1]}"
-            fi
-            
-            # The remaining part is the message
-            parsed_fields["message"]="$log_line"
-            ;;
-        
-        json)
-            # Use jq if available, otherwise basic parsing with grep
-            if command -v jq &>/dev/null; then
-                # Parse with jq and extract known fields
-                # This assumes the JSON structure matches our field names
-                for field in "${IRF_FIELDS[@]}"; do
-                    local value
-                    value=$(echo "$log_line" | jq -r ".$field // empty" 2>/dev/null)
-                    if [[ -n "$value" && "$value" != "null" ]]; then
-                        parsed_fields["$field"]="$value"
-                    fi
-                done
-            else
-                # Fallback basic parsing for JSON logs
-                for field in "${IRF_FIELDS[@]}"; do
-                    if [[ "$log_line" =~ \"$field\":\"([^\"]+)\" ]]; then
-                        parsed_fields["$field"]="${BASH_REMATCH[1]}"
-                    fi
-                done
-            fi
-            ;;
-        
-        custom)
-            # For custom format, we rely on regex patterns defined in the log source config
-            if [[ -n "${TIMESTAMP_REGEX:-}" && "$log_line" =~ $TIMESTAMP_REGEX ]]; then
-                parsed_fields["timestamp"]="${BASH_REMATCH[1]}"
-            fi
-            
-            if [[ -n "${USERNAME_REGEX:-}" && "$log_line" =~ $USERNAME_REGEX ]]; then
-                parsed_fields["username"]="${BASH_REMATCH[1]}"
-            fi
-            
-            if [[ -n "${IP_ADDRESS_REGEX:-}" && "$log_line" =~ $IP_ADDRESS_REGEX ]]; then
-                parsed_fields["ip_address"]="${BASH_REMATCH[1]}"
-            fi
-            
-            if [[ -n "${HOSTNAME_REGEX:-}" && "$log_line" =~ $HOSTNAME_REGEX ]]; then
-                parsed_fields["hostname"]="${BASH_REMATCH[1]}"
-            fi
-            
-            if [[ -n "${SERVICE_REGEX:-}" && "$log_line" =~ $SERVICE_REGEX ]]; then
-                parsed_fields["service"]="${BASH_REMATCH[1]}"
-            fi
-            
-            # The original message is kept intact
-            parsed_fields["message"]="$log_line"
-            ;;
-        
-        *)
-            # Unknown format - store the whole line as the message
-            parsed_fields["message"]="$log_line"
-            irf_log WARN "Unknown log format: $log_format, storing raw message"
-            ;;
-    esac
+            *)
+                # Unknown format - store the whole line as the message
+                parsed_fields["message"]="$log_line"
+                irf_log WARN "Unknown log format: $log_format, storing raw message"
+                ;;
+        esac
+    } || {
+        irf_log WARN "Failed to parse log line: ${log_line:0:100}..."
+        parsed_fields["message"]="$log_line"
+    }
     
-    # Output tab-separated values for the parsed fields
+    # Output with proper quoting and escaping
     local output=""
     for field in "${IRF_FIELDS[@]}"; do
-        output+="${parsed_fields[$field]}"$'\t'
+        # Escape tab characters in field values
+        value="${parsed_fields[$field]//	/\\t}"
+        output+="$value"$'\t'
     done
     
     # Remove trailing tab

@@ -6,10 +6,18 @@ services:
       context: ..
       dockerfile: docker/collector/Dockerfile
     volumes:
-      - /var/log:/var/log:ro
+      - /var/log:/var/log:ro  # Read-only access to logs
       - shared_evidence:/opt/incident-response-framework/evidence
       - shared_logs:/opt/incident-response-framework/logs
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "bash", "-c", "test -f /opt/incident-response-framework/logs/irf.log"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    environment:
+      - IRF_ROOT=/opt/incident-response-framework
+    mem_limit: 512M
     networks:
       - irf-network
 
@@ -21,8 +29,15 @@ services:
       - shared_evidence:/opt/incident-response-framework/evidence
       - shared_logs:/opt/incident-response-framework/logs
     depends_on:
-      - collector
+      collector:
+        condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "bash", "-c", "test -f /opt/incident-response-framework/logs/irf.log"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    mem_limit: 768M
     networks:
       - irf-network
 
@@ -33,10 +48,21 @@ services:
     volumes:
       - shared_evidence:/opt/incident-response-framework/evidence
       - shared_logs:/opt/incident-response-framework/logs
-      - /etc/:/etc/:rw  # For response actions that may need to modify system files
+      - /etc/:/etc/:ro  # Read-only for safety
     depends_on:
-      - analyzer
+      analyzer:
+        condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "bash", "-c", "test -f /opt/incident-response-framework/logs/irf.log"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    mem_limit: 512M
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN  # Only add capabilities you need
     networks:
       - irf-network
 

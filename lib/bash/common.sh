@@ -187,21 +187,53 @@ irf_check_dependencies() {
 
 # Initialize the framework environment
 irf_init() {
-    # Check required directories
+    # Check if already initialized
+    if [[ -n "${IRF_INITIALIZED:-}" ]]; then
+        return 0
+    fi
+    
+    # Set timezone based on configuration
+    if [[ -n "${TIMEZONE:-}" ]]; then
+        export TZ="$TIMEZONE"
+    fi
+    
+    # Check required directories with better error handling
     for dir in "$IRF_LOG_DIR" "$IRF_EVIDENCE_DIR"; do
         if ! irf_validate_directory "$dir"; then
-            mkdir -p "$dir" || {
+            mkdir -p "$dir" 2>/dev/null || {
                 echo "ERROR: Failed to create directory: $dir" >&2
-                exit 1
+                return 1
             }
+            chmod 750 "$dir" 2>/dev/null || echo "WARNING: Failed to set directory permissions: $dir" >&2
         fi
     done
     
-    # Check dependencies
-    irf_check_dependencies || {
-        irf_log WARN "Some dependencies are missing."
-    }
+    # Enhanced dependency checking
+    local missing_critical=0
+    local missing_optional=0
     
+    # Critical dependencies
+    for cmd in "bash" "grep" "awk" "sed"; do
+        if ! command -v "$cmd" &>/dev/null; then
+            echo "ERROR: Critical dependency not found: $cmd" >&2
+            missing_critical=$((missing_critical + 1))
+        fi
+    done
+    
+    # Optional dependencies
+    for cmd in "inotifywait" "journalctl"; do
+        if ! command -v "$cmd" &>/dev/null; then
+            echo "WARNING: Optional dependency not found: $cmd" >&2
+            missing_optional=$((missing_optional + 1))
+        fi
+    done
+    
+    if [[ $missing_critical -gt 0 ]]; then
+        echo "ERROR: $missing_critical critical dependencies missing. Cannot continue." >&2
+        return 1
+    fi
+    
+    export IRF_INITIALIZED=1
     irf_log INFO "Incident Response Framework initialized (v$IRF_VERSION)"
     return 0
 }

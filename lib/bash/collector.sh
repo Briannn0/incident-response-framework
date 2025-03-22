@@ -9,6 +9,16 @@ if [[ -n "${IRF_COLLECTOR_LOADED:-}" ]]; then
 fi
 export IRF_COLLECTOR_LOADED=1
 
+# Validate file paths to prevent path traversal
+irf_validate_path() {
+    local path="$1"
+    if [[ "$path" == *".."* || "$path" == *"~"* ]]; then
+        irf_log ERROR "Invalid path detected: $path"
+        return 1
+    fi
+    return 0
+}
+
 # Make sure common functions are loaded
 if [[ -z "${IRF_COMMON_LOADED:-}" ]]; then
     # shellcheck source=/dev/null
@@ -112,10 +122,16 @@ irf_collect_log_data() {
     local temp_file=""
     local return_code=0
     
+    # Validate config file path
+    if ! irf_validate_path "$config_file"; then
+        return 1
+    fi
+    
     # Check if output file specified, create temp file if not
     if [[ -z "$output_file" ]]; then
         temp_file=$(irf_create_temp_file "irf_collect")
         output_file="$temp_file"
+        chmod 600 "$output_file" || irf_log WARN "Failed to set secure permissions"
     fi
     
     # Reset variables to avoid contamination from previous invocations
@@ -131,60 +147,70 @@ irf_collect_log_data() {
     
     irf_log DEBUG "Collecting logs for source: $LOG_TYPE"
     
-    # Process based on collection method
-    case "$COLLECTION_METHOD" in
-        file)
-            # Split log files by space into an array
-            IFS=' ' read -ra log_file_array <<< "$LOG_FILES"
-            
-            for log_file in "${log_file_array[@]}"; do
-                if irf_validate_log_file "$log_file"; then
-                    irf_log DEBUG "Processing log file: $log_file"
-                    
-                    # Apply filtering if specified
-                    if [[ -n "$FILTER_REGEX" ]] && [[ -n "$EXCLUDE_REGEX" ]]; then
-                        grep -E "$FILTER_REGEX" "$log_file" | grep -v -E "$EXCLUDE_REGEX" >> "$output_file" || true
-                    elif [[ -n "$FILTER_REGEX" ]]; then
-                        grep -E "$FILTER_REGEX" "$log_file" >> "$output_file" || true
-                    elif [[ -n "$EXCLUDE_REGEX" ]]; then
-                        grep -v -E "$EXCLUDE_REGEX" "$log_file" >> "$output_file" || true
-                    else
-                        cat "$log_file" >> "$output_file" || {
-                            irf_log ERROR "Failed to read log file: $log_file"
-                            return_code=1
-                        }
-                    fi
-                else
-                    irf_log WARN "Skipping invalid log file: $log_file"
-                fi
-            done
-            ;;
-            
-        syslog)
-            irf_log WARN "Syslog collection method not yet implemented"
-            return_code=1
-            ;;
-            
-        journald)
-            if irf_verify_command "journalctl"; then
-                # Use journalctl to collect logs
-                local journald_args=("-u" "$LOG_TYPE" "--no-pager")
+    # Add locking for file access
+    (
+        if ! flock -n 200; then
+            irf_log ERROR "Another process is accessing the log file"
+            return 1
+        fi
+        
+        # Process based on collection method
+        case "$COLLECTION_METHOD" in
+            file)
+                # Split log files by space into an array
+                IFS=' ' read -ra log_file_array <<< "$LOG_FILES"
                 
-                journalctl "${journald_args[@]}" >> "$output_file" || {
-                    irf_log ERROR "Failed to collect journald logs for: $LOG_TYPE"
-                    return_code=1
-                }
-            else
-                irf_log ERROR "journalctl command not found, cannot collect journald logs"
+                for log_file in "${log_file_array[@]}"; do
+                    if irf_validate_log_file "$log_file"; then
+                        irf_log DEBUG "Processing log file: $log_file"
+                        
+                        # Apply filtering if specified
+                        if [[ -n "$FILTER_REGEX" ]] && [[ -n "$EXCLUDE_REGEX" ]]; then
+                            grep -E "$FILTER_REGEX" "$log_file" | grep -v -E "$EXCLUDE_REGEX" >> "$output_file" || true
+                        elif [[ -n "$FILTER_REGEX" ]]; then
+                            grep -E "$FILTER_REGEX" "$log_file" >> "$output_file" || true
+                        elif [[ -n "$EXCLUDE_REGEX" ]]; then
+                            grep -v -E "$EXCLUDE_REGEX" "$log_file" >> "$output_file" || true
+                        else
+                            cat "$log_file" >> "$output_file" || {
+                                irf_log ERROR "Failed to read log file: $log_file"
+                                return_code=1
+                            }
+                        fi
+                    else
+                        irf_log WARN "Skipping invalid log file: $log_file"
+                    fi
+                done
+                ;;
+                
+            syslog)
+                irf_log WARN "Syslog collection method not yet implemented"
                 return_code=1
-            fi
-            ;;
-            
-        *)
-            irf_log ERROR "Unknown collection method: $COLLECTION_METHOD"
-            return_code=1
-            ;;
-    esac
+                ;;
+                
+            journald)
+                if irf_verify_command "journalctl"; then
+                    # Use journalctl to collect logs
+                    local journald_args=("-u" "$LOG_TYPE" "--no-pager")
+                    
+                    journalctl "${journald_args[@]}" >> "$output_file" || {
+                        irf_log ERROR "Failed to collect journald logs for: $LOG_TYPE"
+                        return_code=1
+                    }
+                else
+                    irf_log ERROR "journalctl command not found, cannot collect journald logs"
+                    return_code=1
+                fi
+                ;;
+                
+            *)
+                irf_log ERROR "Unknown collection method: $COLLECTION_METHOD"
+                return_code=1
+                ;;
+        esac
+        
+        flock -u 200
+    ) 200>"${IRF_LOG_DIR}/.collector_lock"
     
     # If using a temp file, output the content and clean up
     if [[ -n "$temp_file" ]]; then

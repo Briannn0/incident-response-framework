@@ -9,6 +9,7 @@ set -e
 # Default installation directory
 DEFAULT_INSTALL_DIR="/opt/incident-response-framework"
 INSTALL_DIR="$DEFAULT_INSTALL_DIR"
+DOCKER_INSTALL=false
 
 # Display usage information
 show_usage() {
@@ -19,6 +20,7 @@ Usage: $0 [OPTIONS]
 
 Options:
   --prefix DIR    Installation directory (default: $DEFAULT_INSTALL_DIR)
+  --docker        Configure for Docker environment
   --help          Display this help message
 EOF
 }
@@ -37,6 +39,11 @@ while [[ $# -gt 0 ]]; do
             fi
             ;;
             
+        --docker)
+            DOCKER_INSTALL=true
+            shift
+            ;;
+            
         --help)
             show_usage
             exit 0
@@ -49,6 +56,110 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# Add Docker-specific configuration
+if [[ "$DOCKER_INSTALL" == true ]]; then
+    echo "Configuring for Docker environment..."
+    
+    # Create Docker-specific directory structure
+    mkdir -p docker/{collector,analyzer,responder}
+    
+    # Copy Dockerfiles if they don't exist
+    for component in collector analyzer responder; do
+        if [[ ! -f "docker/$component/Dockerfile" ]]; then
+            echo "Creating Dockerfile for $component..."
+            cat > "docker/$component/Dockerfile" << EOF
+FROM ubuntu:22.04
+
+# Install required dependencies
+RUN apt-get update && apt-get install -y \\
+    bash \\
+    grep \\
+    gawk \\
+    sed \\
+    inotify-tools \\
+    && rm -rf /var/lib/apt/lists/*
+
+# Set the working directory
+WORKDIR /opt/incident-response-framework
+
+# Copy the framework files
+COPY . .
+
+# Set permissions
+RUN chmod -R 750 /opt/incident-response-framework/bin
+RUN chmod -R 640 /opt/incident-response-framework/conf
+RUN chmod 750 /opt/incident-response-framework/conf /opt/incident-response-framework/conf/sources /opt/incident-response-framework/conf/rules /opt/incident-response-framework/conf/actions
+
+# Create necessary directories
+RUN mkdir -p /opt/incident-response-framework/logs /opt/incident-response-framework/evidence/incidents /opt/incident-response-framework/evidence/archives
+
+# Set environment variables
+ENV IRF_ROOT=/opt/incident-response-framework
+
+# Set the entrypoint
+ENTRYPOINT ["/opt/incident-response-framework/bin/irf", "$component"]
+EOF
+        fi
+    done
+    
+    # Create docker-compose.yml if it doesn't exist
+    if [[ ! -f "docker/docker-compose.yml" ]]; then
+        echo "Creating docker-compose.yml..."
+        cat > "docker/docker-compose.yml" << EOF
+version: '3'
+
+services:
+  collector:
+    build:
+      context: ..
+      dockerfile: docker/collector/Dockerfile
+    volumes:
+      - /var/log:/var/log:ro
+      - shared_evidence:/opt/incident-response-framework/evidence
+      - shared_logs:/opt/incident-response-framework/logs
+    restart: unless-stopped
+    networks:
+      - irf-network
+
+  analyzer:
+    build:
+      context: ..
+      dockerfile: docker/analyzer/Dockerfile
+    volumes:
+      - shared_evidence:/opt/incident-response-framework/evidence
+      - shared_logs:/opt/incident-response-framework/logs
+    depends_on:
+      - collector
+    restart: unless-stopped
+    networks:
+      - irf-network
+
+  responder:
+    build:
+      context: ..
+      dockerfile: docker/responder/Dockerfile
+    volumes:
+      - shared_evidence:/opt/incident-response-framework/evidence
+      - shared_logs:/opt/incident-response-framework/logs
+      - /etc/:/etc/:ro
+    depends_on:
+      - analyzer
+    restart: unless-stopped
+    networks:
+      - irf-network
+
+volumes:
+  shared_evidence:
+  shared_logs:
+
+networks:
+  irf-network:
+EOF
+    fi
+    
+    echo "Docker configuration files created successfully!"
+fi
 
 # Check for root permissions if installing to system directory
 if [[ "$INSTALL_DIR" == "/opt/"* || "$INSTALL_DIR" == "/usr/"* ]] && [[ $EUID -ne 0 ]]; then

@@ -1,11 +1,12 @@
 FROM ubuntu:22.04
 
 # Install required dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
     grep \
     gawk \
     sed \
+    iptables \ 
     && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory
@@ -21,6 +22,10 @@ RUN chmod 750 /opt/incident-response-framework/conf /opt/incident-response-frame
 
 # Set environment variables
 ENV IRF_ROOT=/opt/incident-response-framework
+
+# The responder may need to run as root for some response actions
+# If possible, use capabilities instead of running as root
+USER root
 
 # Set the entrypoint
 ENTRYPOINT ["/opt/incident-response-framework/bin/irf", "respond"]

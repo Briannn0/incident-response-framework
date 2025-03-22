@@ -27,4 +27,4 @@ RUN mkdir -p /opt/incident-response-framework/logs /opt/incident-response-framew
 ENV IRF_ROOT=/opt/incident-response-framework
 
 # Set the entrypoint
-ENTRYPOINT ["/opt/incident-response-framework/bin/irf", "collect"]
+ENTRYPOINT ["/opt/incident-response-framework/bin/irf", "detect"]

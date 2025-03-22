@@ -8,6 +8,19 @@ IRF_BIN_DIR=$(dirname "$(readlink -f "$0")")
 IRF_ROOT=$(dirname "$IRF_BIN_DIR")
 export IRF_ROOT
 
+# Add version and command validation
+readonly IRF_VALID_COMMANDS=("collect" "parse" "detect" "monitor" "respond" "test" "help")
+
+irf_is_valid_command() {
+    local cmd="$1"
+    for valid_cmd in "${IRF_VALID_COMMANDS[@]}"; do
+        if [[ "$cmd" == "$valid_cmd" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
 # Ensure common libraries are loaded
 if [[ ! -f "${IRF_ROOT}/lib/bash/common.sh" ]]; then
     echo "ERROR: Required library not found: ${IRF_ROOT}/lib/bash/common.sh" >&2
@@ -58,15 +71,32 @@ fi
 COMMAND="$1"
 shift
 
+# Validate command
+if [[ "$COMMAND" == "--version" || "$COMMAND" == "-v" ]]; then
+    show_version
+    exit 0
+fi
+
+if ! irf_is_valid_command "$COMMAND"; then
+    echo "ERROR: Unknown command: $COMMAND" >&2
+    echo "Run 'irf help' for a list of valid commands." >&2
+    exit 1
+fi
+
+# Command handling with better error messages
 case "$COMMAND" in
     collect)
-        # Ensure collector binary exists
-        if [[ -x "${IRF_BIN_DIR}/irf-collector" ]]; then
-            exec "${IRF_BIN_DIR}/irf-collector" "$@"
-        else
-            irf_log ERROR "Collector binary not found: ${IRF_BIN_DIR}/irf-collector"
+        # Check for collector binary
+        COLLECTOR_BIN="${IRF_BIN_DIR}/irf-collector"
+        if [[ ! -x "$COLLECTOR_BIN" ]]; then
+            irf_log ERROR "Collector binary not found or not executable: $COLLECTOR_BIN"
             exit 1
         fi
+        
+        exec "$COLLECTOR_BIN" "$@" || {
+            irf_log ERROR "Failed to execute collector"
+            exit 1
+        }
         ;;
         
     parse)
@@ -80,40 +110,54 @@ case "$COMMAND" in
             irf_log ERROR "No source configuration specified for parsing"
             echo "Usage: irf parse SOURCE_CONFIG [INPUT_FILE] [OUTPUT_FILE]" >&2
             exit 1
-        fi
+        }
         
-        irf_parse_logs "$@"
-        exit $?
+        irf_parse_logs "$@" || {
+            irf_log ERROR "Log parsing failed"
+            exit 1
+        }
         ;;
         
     detect)
-        # Ensure detect binary exists
-        if [[ -x "${IRF_BIN_DIR}/irf-detect" ]]; then
-            exec "${IRF_BIN_DIR}/irf-detect" "$@"
-        else
-            irf_log ERROR "Detect binary not found: ${IRF_BIN_DIR}/irf-detect"
+        # Check for detect binary
+        DETECT_BIN="${IRF_BIN_DIR}/irf-detect"
+        if [[ ! -x "$DETECT_BIN" ]]; then
+            irf_log ERROR "Detect binary not found or not executable: $DETECT_BIN"
             exit 1
         fi
+        
+        exec "$DETECT_BIN" "$@" || {
+            irf_log ERROR "Failed to execute detector"
+            exit 1
+        }
         ;;
         
     monitor)
-        # Ensure monitor binary exists
-        if [[ -x "${IRF_BIN_DIR}/irf-monitor" ]]; then
-            exec "${IRF_BIN_DIR}/irf-monitor" "$@"
-        else
-            irf_log ERROR "Monitor binary not found: ${IRF_BIN_DIR}/irf-monitor"
+        # Check for monitor binary
+        MONITOR_BIN="${IRF_BIN_DIR}/irf-monitor"
+        if [[ ! -x "$MONITOR_BIN" ]]; then
+            irf_log ERROR "Monitor binary not found or not executable: $MONITOR_BIN"
             exit 1
         fi
+        
+        exec "$MONITOR_BIN" "$@" || {
+            irf_log ERROR "Failed to execute monitor"
+            exit 1
+        }
         ;;
         
     respond)
-        # Ensure respond binary exists
-        if [[ -x "${IRF_BIN_DIR}/irf-respond" ]]; then
-            exec "${IRF_BIN_DIR}/irf-respond" "$@"
-        else
-            irf_log ERROR "Respond binary not found: ${IRF_BIN_DIR}/irf-respond"
+        # Check for respond binary
+        RESPOND_BIN="${IRF_BIN_DIR}/irf-respond"
+        if [[ ! -x "$RESPOND_BIN" ]]; then
+            irf_log ERROR "Respond binary not found or not executable: $RESPOND_BIN"
             exit 1
         fi
+        
+        exec "$RESPOND_BIN" "$@" || {
+            irf_log ERROR "Failed to execute responder"
+            exit 1
+        }
         ;;
         
     test)
@@ -225,12 +269,9 @@ case "$COMMAND" in
         fi
         ;;
         
-    --version|-v)
-        show_version
-        ;;
-        
     *)
-        echo "Unknown command: $COMMAND" >&2
+        # Should never get here due to validation
+        echo "ERROR: Command validation failed for: $COMMAND" >&2
         show_usage
         exit 1
         ;;
