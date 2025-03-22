@@ -1,0 +1,23 @@
+[2025-03-22 16:25:17] [ERROR] [irf] [30899] Invalid regex pattern: Failed password
+[2025-03-22 16:25:17] [WARN] [irf] [30899] Skipping rule BF-SSH-001 due to invalid pattern: Failed password
+[2025-03-22 16:25:17] [ERROR] [irf] [30899] Invalid regex pattern: authentication failure
+[2025-03-22 16:25:17] [WARN] [irf] [30899] Skipping rule BF-SSH-002 due to invalid pattern: authentication failure
+[2025-03-22 16:25:17] [ERROR] [irf] [30899] Invalid regex pattern: Invalid user
+[2025-03-22 16:25:17] [WARN] [irf] [30899] Skipping rule BF-SSH-003 due to invalid pattern: Invalid user
+[2025-03-22 16:25:17] [ERROR] [irf] [30899] Invalid regex pattern: Connection closed by invalid user
+[2025-03-22 16:25:17] [WARN] [irf] [30899] Skipping rule BF-SSH-004 due to invalid pattern: Connection closed by invalid user
+[2025-03-22 16:25:17] [ERROR] [irf] [30899] Invalid regex pattern: authentication failure
+[2025-03-22 16:25:17] [WARN] [irf] [30899] Skipping rule BF-SUDO-001 due to invalid pattern: authentication failure
+[2025-03-22 16:25:17] [ERROR] [irf] [30899] Invalid regex pattern: 3 incorrect password attempts
+[2025-03-22 16:25:17] [WARN] [irf] [30899] Skipping rule BF-SUDO-002 due to invalid pattern: 3 incorrect password attempts
+[2025-03-22 16:25:17] [ERROR] [irf] [30899] Invalid regex pattern: failed login
+[2025-03-22 16:25:17] [WARN] [irf] [30899] Skipping rule BF-AUTH-001 due to invalid pattern: failed login
+[2025-03-22 16:25:17] [ERROR] [irf] [30899] Invalid regex pattern: pam_unix\(.*\): authentication failure
+[2025-03-22 16:25:17] [WARN] [irf] [30899] Skipping rule BF-AUTH-002 due to invalid pattern: pam_unix\(.*\): authentication failure
+[2025-03-22 16:25:17] [WARN] [irf] [30899] Found 8 invalid rules in conf/rules/brute-force.rules
+[2025-03-22 16:25:17] [WARN] [irf] [30899] No valid rules found in rule file: conf/rules/brute-force.rules
+[2025-03-22 16:25:17] [ERROR] [irf] [30899] Failed to load rule file: conf/rules/brute-force.rules
+[2025-03-22 16:34:35] [ERROR] [irf] [35695] Collector binary not found or not executable: /workspaces/incident-response-framework/bin/irf/irf-collector
+[2025-03-22 16:45:29] [ERROR] [irf] [41001] File does not exist: /var/log/auth.log
+[2025-03-22 16:45:29] [ERROR] [irf] [41001] Invalid input file for parsing: /var/log/auth.log
+[2025-03-22 16:45:29] [ERROR] [irf] [41001] Log parsing failed

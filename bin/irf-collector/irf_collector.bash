@@ -5,8 +5,21 @@
 
 # Get the directory where this script is located
 IRF_BIN_DIR=$(dirname "$(readlink -f "$0")")
-IRF_ROOT=$(dirname "$IRF_BIN_DIR")
+IRF_ROOT=$(dirname "$(dirname "$IRF_BIN_DIR")")
 export IRF_ROOT
+
+# Set up key directory locations
+export IRF_LOG_DIR="${IRF_ROOT}/logs"
+export IRF_EVIDENCE_DIR="${IRF_ROOT}/evidence"
+export IRF_CONF_DIR="${IRF_ROOT}/conf"
+
+# Enhanced debugging
+echo "DEBUG: IRF_ROOT=$IRF_ROOT" >&2
+echo "DEBUG: IRF_LOG_DIR=$IRF_LOG_DIR" >&2
+echo "DEBUG: IRF_EVIDENCE_DIR=$IRF_EVIDENCE_DIR" >&2
+
+# Enhanced debugging
+echo "DEBUG: IRF_ROOT=$IRF_ROOT" >&2
 
 # Ensure common libraries are loaded
 if [[ ! -f "${IRF_ROOT}/lib/bash/common.sh" ]]; then
@@ -14,14 +27,57 @@ if [[ ! -f "${IRF_ROOT}/lib/bash/common.sh" ]]; then
     exit 1
 fi
 
+# Source common library with better error handling
+echo "DEBUG: Loading common.sh from ${IRF_ROOT}/lib/bash/common.sh" >&2
 # shellcheck source=/dev/null
-source "${IRF_ROOT}/lib/bash/common.sh"
+source "${IRF_ROOT}/lib/bash/common.sh" || {
+    echo "ERROR: Failed to load common.sh library" >&2
+    exit 1
+}
+
+# Define a basic logging function in case the logger isn't loaded
+irf_log() {
+    local level="$1"
+    shift
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*" >&2
+}
+
+# Check logger library explicitly
+LOGGER_LIB="${IRF_ROOT}/lib/bash/logger.sh"
+if [[ ! -f "$LOGGER_LIB" ]]; then
+    echo "ERROR: Logger library not found: $LOGGER_LIB" >&2
+    exit 1
+fi
+
+echo "DEBUG: Loading logger from $LOGGER_LIB" >&2
+# shellcheck source=/dev/null
+source "$LOGGER_LIB" || {
+    echo "ERROR: Failed to load logger library" >&2
+    exit 1
+}
+
+echo "DEBUG: Logger loaded, checking irf_log function" >&2
+# Verify logger function exists
+if ! type irf_log >/dev/null 2>&1; then
+    echo "ERROR: irf_log function not available after loading libraries" >&2
+    # Continue with our fallback implementation
+    echo "DEBUG: Using fallback logger implementation" >&2
+fi
 
 # Load the collector library
-source "${IRF_ROOT}/lib/bash/collector.sh" || {
+echo "DEBUG: Loading collector library" >&2
+COLLECTOR_LIB="${IRF_ROOT}/lib/bash/collector.sh"
+if [[ ! -f "$COLLECTOR_LIB" ]]; then
+    irf_log ERROR "Collector library not found: $COLLECTOR_LIB"
+    exit 1
+fi
+
+# shellcheck source=/dev/null
+source "$COLLECTOR_LIB" || {
     irf_log ERROR "Failed to load collector library"
     exit 1
 }
+
 
 # Initialize variables
 OUTPUT_DIR="${IRF_EVIDENCE_DIR:-${IRF_ROOT}/evidence}/collected"
@@ -174,11 +230,18 @@ trap 'kill $MONITOR_PID 2>/dev/null || true' EXIT
 irf_log INFO "Starting log collection..."
 
 # Discover log sources if not already done
-if [[ ${#IRF_LOG_SOURCES[@]} -eq 0 ]]; then
+if [[ -z "${IRF_LOG_SOURCES+x}" ]] || [[ ${#IRF_LOG_SOURCES[@]} -eq 0 ]]; then
+    echo "DEBUG: Calling irf_discover_log_sources()" >&2
     irf_discover_log_sources || {
         irf_log ERROR "Failed to discover log sources"
         exit 1
     }
+    
+    # Check if we have sources after discovery
+    if [[ ${#IRF_LOG_SOURCES[@]} -eq 0 ]]; then
+        irf_log ERROR "No log sources found after discovery"
+        exit 1
+    fi
 fi
 
 # Create timestamp directory for this collection run

@@ -5,7 +5,7 @@
 
 # Get the directory where this script is located
 IRF_BIN_DIR=$(dirname "$(readlink -f "$0")")
-IRF_ROOT=$(dirname "$IRF_BIN_DIR")
+IRF_ROOT=$(dirname "$(dirname "$IRF_BIN_DIR")")
 export IRF_ROOT
 
 # Add version and command validation
@@ -87,7 +87,7 @@ fi
 case "$COMMAND" in
     collect)
         # Check for collector binary
-        COLLECTOR_BIN="${IRF_BIN_DIR}/irf-collector"
+        COLLECTOR_BIN="${IRF_ROOT}/bin/irf-collector/irf_collector.bash"
         if [[ ! -x "$COLLECTOR_BIN" ]]; then
             irf_log ERROR "Collector binary not found or not executable: $COLLECTOR_BIN"
             exit 1
@@ -110,7 +110,7 @@ case "$COMMAND" in
             irf_log ERROR "No source configuration specified for parsing"
             echo "Usage: irf parse SOURCE_CONFIG [INPUT_FILE] [OUTPUT_FILE]" >&2
             exit 1
-        }
+        fi
         
         irf_parse_logs "$@" || {
             irf_log ERROR "Log parsing failed"

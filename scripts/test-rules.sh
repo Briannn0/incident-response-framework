@@ -27,6 +27,8 @@ source "${IRF_ROOT}/lib/bash/detector.sh" || {
 RULE_FILE=""
 SAMPLE_LOG=""
 TEMP_DIR=""
+GENERATE=false  # Add this line
+TEST_ALL=false  # Add this line
 
 # Display usage information
 show_usage() {
