@@ -90,12 +90,9 @@ irf_discover_log_sources() {
 irf_validate_log_file() {
     local log_file="$1"
     
-    # Skip non-existent files in arrays when file globbing returned nothing
-    [[ "$log_file" == *\** ]] && return 1
-    
-    # Check file existence and readability
+    # Skip non-existent files but provide clear message
     if [[ ! -f "$log_file" ]]; then
-        irf_log WARN "Log file does not exist: $log_file"
+        irf_log WARN "Log file does not exist (will be monitored when created): $log_file"
         return 1
     fi
     

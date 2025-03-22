@@ -27,8 +27,8 @@ source "${IRF_ROOT}/lib/bash/detector.sh" || {
 RULE_FILE=""
 SAMPLE_LOG=""
 TEMP_DIR=""
-GENERATE=false  # Add this line
-TEST_ALL=false  # Add this line
+GENERATE=false
+TEST_ALL=false
 
 # Display usage information
 show_usage() {
@@ -146,14 +146,16 @@ May 21 03:20:55	syslog	server1	WARN	root	server1		bash	5681	Command executed: ca
 May 21 03:25:10	syslog	server1	WARN	user1	server1		bash	5682	Permission denied: /etc/passwd
 EOF
     
+    # Log the generated files details but don't include in function output
     irf_log INFO "Generated sample log files:"
     find "$output_dir" -type f -name "*.log" | sort | while read -r log_file; do
         local count
         count=$(wc -l < "$log_file")
         count=$((count - 1))  # Subtract header line
-        echo "  - $(basename "$log_file"): $count log entries"
+        irf_log INFO "  - $(basename "$log_file"): $count log entries"
     done
     
+    # Return only the directory path
     echo "$output_dir"
 }
 

@@ -21,3 +21,315 @@
 [2025-03-22 16:45:29] [ERROR] [irf] [41001] File does not exist: /var/log/auth.log
 [2025-03-22 16:45:29] [ERROR] [irf] [41001] Invalid input file for parsing: /var/log/auth.log
 [2025-03-22 16:45:29] [ERROR] [irf] [41001] Log parsing failed
+[2025-03-22 19:02:20] [ERROR] [irf] [38707] Invalid regex pattern: Failed\ password
+[2025-03-22 19:02:20] [WARN] [irf] [38707] Skipping rule BF-SSH-001 due to invalid pattern: Failed\ password
+[2025-03-22 19:02:20] [ERROR] [irf] [38707] Invalid regex pattern: authentication failure
+[2025-03-22 19:02:20] [WARN] [irf] [38707] Skipping rule BF-SSH-002 due to invalid pattern: authentication failure
+[2025-03-22 19:02:20] [ERROR] [irf] [38707] Invalid regex pattern: Invalid user
+[2025-03-22 19:02:20] [WARN] [irf] [38707] Skipping rule BF-SSH-003 due to invalid pattern: Invalid user
+[2025-03-22 19:02:20] [ERROR] [irf] [38707] Invalid regex pattern: Connection closed by invalid user
+[2025-03-22 19:02:20] [WARN] [irf] [38707] Skipping rule BF-SSH-004 due to invalid pattern: Connection closed by invalid user
+[2025-03-22 19:02:20] [ERROR] [irf] [38707] Invalid regex pattern: authentication failure
+[2025-03-22 19:02:20] [WARN] [irf] [38707] Skipping rule BF-SUDO-001 due to invalid pattern: authentication failure
+[2025-03-22 19:02:20] [ERROR] [irf] [38707] Invalid regex pattern: 3 incorrect password attempts
+[2025-03-22 19:02:20] [WARN] [irf] [38707] Skipping rule BF-SUDO-002 due to invalid pattern: 3 incorrect password attempts
+[2025-03-22 19:02:20] [ERROR] [irf] [38707] Invalid regex pattern: failed login
+[2025-03-22 19:02:20] [WARN] [irf] [38707] Skipping rule BF-AUTH-001 due to invalid pattern: failed login
+[2025-03-22 19:02:20] [ERROR] [irf] [38707] Invalid regex pattern: pam_unix\(.*\): authentication failure
+[2025-03-22 19:02:20] [WARN] [irf] [38707] Skipping rule BF-AUTH-002 due to invalid pattern: pam_unix\(.*\): authentication failure
+[2025-03-22 19:02:20] [WARN] [irf] [38707] Found 8 invalid rules in /workspaces/incident-response-framework/conf/rules/brute-force.rules
+[2025-03-22 19:02:20] [WARN] [irf] [38707] No valid rules found in rule file: /workspaces/incident-response-framework/conf/rules/brute-force.rules
+[2025-03-22 19:02:20] [ERROR] [irf] [38707] Failed to load rule file: /workspaces/incident-response-framework/conf/rules/brute-force.rules
+[2025-03-22 19:06:15] [ERROR] [irf] [40694] Invalid regex pattern: Failed\ password
+[2025-03-22 19:06:15] [WARN] [irf] [40694] Skipping rule BF-SSH-001 due to invalid pattern: Failed\ password
+[2025-03-22 19:06:15] [ERROR] [irf] [40694] Invalid regex pattern: authentication failure
+[2025-03-22 19:06:15] [WARN] [irf] [40694] Skipping rule BF-SSH-002 due to invalid pattern: authentication failure
+[2025-03-22 19:06:15] [ERROR] [irf] [40694] Invalid regex pattern: Invalid user
+[2025-03-22 19:06:15] [WARN] [irf] [40694] Skipping rule BF-SSH-003 due to invalid pattern: Invalid user
+[2025-03-22 19:06:15] [ERROR] [irf] [40694] Invalid regex pattern: Connection closed by invalid user
+[2025-03-22 19:06:15] [WARN] [irf] [40694] Skipping rule BF-SSH-004 due to invalid pattern: Connection closed by invalid user
+[2025-03-22 19:06:15] [ERROR] [irf] [40694] Invalid regex pattern: authentication failure
+[2025-03-22 19:06:15] [WARN] [irf] [40694] Skipping rule BF-SUDO-001 due to invalid pattern: authentication failure
+[2025-03-22 19:06:15] [ERROR] [irf] [40694] Invalid regex pattern: 3 incorrect password attempts
+[2025-03-22 19:06:15] [WARN] [irf] [40694] Skipping rule BF-SUDO-002 due to invalid pattern: 3 incorrect password attempts
+[2025-03-22 19:06:15] [ERROR] [irf] [40694] Invalid regex pattern: failed login
+[2025-03-22 19:06:15] [WARN] [irf] [40694] Skipping rule BF-AUTH-001 due to invalid pattern: failed login
+[2025-03-22 19:06:15] [ERROR] [irf] [40694] Invalid regex pattern: pam_unix\(.*\): authentication failure
+[2025-03-22 19:06:15] [WARN] [irf] [40694] Skipping rule BF-AUTH-002 due to invalid pattern: pam_unix\(.*\): authentication failure
+[2025-03-22 19:06:15] [WARN] [irf] [40694] Found 8 invalid rules in /workspaces/incident-response-framework/conf/rules/brute-force.rules
+[2025-03-22 19:06:15] [WARN] [irf] [40694] No valid rules found in rule file: /workspaces/incident-response-framework/conf/rules/brute-force.rules
+[2025-03-22 19:06:15] [ERROR] [irf] [40694] Failed to load rule file: /workspaces/incident-response-framework/conf/rules/brute-force.rules
+[2025-03-22 19:06:32] [ERROR] [irf] [41094] Invalid regex pattern: Failed\ password
+[2025-03-22 19:06:32] [WARN] [irf] [41094] Skipping rule BF-SSH-001 due to invalid pattern: Failed\ password
+[2025-03-22 19:06:32] [ERROR] [irf] [41094] Invalid regex pattern: authentication failure
+[2025-03-22 19:06:32] [WARN] [irf] [41094] Skipping rule BF-SSH-002 due to invalid pattern: authentication failure
+[2025-03-22 19:06:32] [ERROR] [irf] [41094] Invalid regex pattern: Invalid user
+[2025-03-22 19:06:32] [WARN] [irf] [41094] Skipping rule BF-SSH-003 due to invalid pattern: Invalid user
+[2025-03-22 19:06:32] [ERROR] [irf] [41094] Invalid regex pattern: Connection closed by invalid user
+[2025-03-22 19:06:32] [WARN] [irf] [41094] Skipping rule BF-SSH-004 due to invalid pattern: Connection closed by invalid user
+[2025-03-22 19:06:32] [ERROR] [irf] [41094] Invalid regex pattern: authentication failure
+[2025-03-22 19:06:32] [WARN] [irf] [41094] Skipping rule BF-SUDO-001 due to invalid pattern: authentication failure
+[2025-03-22 19:06:32] [ERROR] [irf] [41094] Invalid regex pattern: 3 incorrect password attempts
+[2025-03-22 19:06:32] [WARN] [irf] [41094] Skipping rule BF-SUDO-002 due to invalid pattern: 3 incorrect password attempts
+[2025-03-22 19:06:32] [ERROR] [irf] [41094] Invalid regex pattern: failed login
+[2025-03-22 19:06:32] [WARN] [irf] [41094] Skipping rule BF-AUTH-001 due to invalid pattern: failed login
+[2025-03-22 19:06:32] [ERROR] [irf] [41094] Invalid regex pattern: pam_unix\(.*\): authentication failure
+[2025-03-22 19:06:32] [WARN] [irf] [41094] Skipping rule BF-AUTH-002 due to invalid pattern: pam_unix\(.*\): authentication failure
+[2025-03-22 19:06:32] [WARN] [irf] [41094] Found 8 invalid rules in /workspaces/incident-response-framework/conf/rules/brute-force.rules
+[2025-03-22 19:06:32] [WARN] [irf] [41094] No valid rules found in rule file: /workspaces/incident-response-framework/conf/rules/brute-force.rules
+[2025-03-22 19:06:32] [ERROR] [irf] [41094] Failed to load rule file: /workspaces/incident-response-framework/conf/rules/brute-force.rules
+[2025-03-22 19:09:03] [ERROR] [irf] [42391] Invalid regex pattern: Failed\ password
+[2025-03-22 19:09:03] [WARN] [irf] [42391] Skipping rule BF-SSH-001 due to invalid pattern: Failed\ password
+[2025-03-22 19:09:03] [ERROR] [irf] [42391] Invalid regex pattern: authentication failure
+[2025-03-22 19:09:03] [WARN] [irf] [42391] Skipping rule BF-SSH-002 due to invalid pattern: authentication failure
+[2025-03-22 19:09:03] [ERROR] [irf] [42391] Invalid regex pattern: Invalid user
+[2025-03-22 19:09:03] [WARN] [irf] [42391] Skipping rule BF-SSH-003 due to invalid pattern: Invalid user
+[2025-03-22 19:09:03] [ERROR] [irf] [42391] Invalid regex pattern: Connection closed by invalid user
+[2025-03-22 19:09:03] [WARN] [irf] [42391] Skipping rule BF-SSH-004 due to invalid pattern: Connection closed by invalid user
+[2025-03-22 19:09:03] [ERROR] [irf] [42391] Invalid regex pattern: authentication failure
+[2025-03-22 19:09:03] [WARN] [irf] [42391] Skipping rule BF-SUDO-001 due to invalid pattern: authentication failure
+[2025-03-22 19:09:03] [ERROR] [irf] [42391] Invalid regex pattern: 3 incorrect password attempts
+[2025-03-22 19:09:03] [WARN] [irf] [42391] Skipping rule BF-SUDO-002 due to invalid pattern: 3 incorrect password attempts
+[2025-03-22 19:09:03] [ERROR] [irf] [42391] Invalid regex pattern: failed login
+[2025-03-22 19:09:03] [WARN] [irf] [42391] Skipping rule BF-AUTH-001 due to invalid pattern: failed login
+[2025-03-22 19:09:03] [ERROR] [irf] [42391] Invalid regex pattern: pam_unix\(.*\): authentication failure
+[2025-03-22 19:09:03] [WARN] [irf] [42391] Skipping rule BF-AUTH-002 due to invalid pattern: pam_unix\(.*\): authentication failure
+[2025-03-22 19:09:03] [WARN] [irf] [42391] Found 8 invalid rules in /workspaces/incident-response-framework/conf/rules/brute-force.rules
+[2025-03-22 19:09:03] [WARN] [irf] [42391] No valid rules found in rule file: /workspaces/incident-response-framework/conf/rules/brute-force.rules
+[2025-03-22 19:09:03] [ERROR] [irf] [42391] Failed to load rule file: /workspaces/incident-response-framework/conf/rules/brute-force.rules
+[2025-03-22 19:12:24] [WARN] [irf] [44078] Potentially problematic regex pattern: failed login (allowing it anyway)
+[2025-03-22 19:12:25] [WARN] [irf] [44078] Potentially problematic regex pattern: failed login (allowing it anyway)
+[2025-03-22 19:12:25] [WARN] [irf] [44078] Potentially problematic regex pattern: failed login (allowing it anyway)
+[2025-03-22 19:12:26] [WARN] [irf] [44078] Potentially problematic regex pattern: failed login (allowing it anyway)
+[2025-03-22 19:12:26] [WARN] [irf] [44078] Potentially problematic regex pattern: (echo|printf).*\|.*base64.*\|.*bash (allowing it anyway)
+[2025-03-22 19:12:26] [WARN] [irf] [44078] Potentially problematic regex pattern: (curl|wget).*\|.*bash (allowing it anyway)
+[2025-03-22 19:12:26] [WARN] [irf] [44078] Potentially problematic regex pattern: (curl|wget).*-O.* (allowing it anyway)
+[2025-03-22 19:12:26] [WARN] [irf] [44078] Potentially problematic regex pattern: (bash|nc|python|perl).*-e (allowing it anyway)
+[2025-03-22 19:12:26] [WARN] [irf] [44078] Potentially problematic regex pattern: /tmp/[^[:space:]]+ (allowing it anyway)
+[2025-03-22 19:12:26] [WARN] [irf] [44078] Potentially problematic regex pattern: crontab.*-e (allowing it anyway)
+[2025-03-22 19:12:26] [WARN] [irf] [44078] Potentially problematic regex pattern: /etc/cron (allowing it anyway)
+[2025-03-22 19:12:26] [WARN] [irf] [44078] Potentially problematic regex pattern: authorized_keys (allowing it anyway)
+[2025-03-22 19:12:26] [WARN] [irf] [44078] Potentially problematic regex pattern: (/etc/init|/etc/systemd|rc\.d) (allowing it anyway)
+[2025-03-22 19:12:26] [WARN] [irf] [44078] Potentially problematic regex pattern: at command|atd (allowing it anyway)
+[2025-03-22 19:12:26] [WARN] [irf] [44078] Potentially problematic regex pattern: (\.bashrc|\.bash_profile|\.profile) (allowing it anyway)
+[2025-03-22 19:12:26] [WARN] [irf] [44078] Potentially problematic regex pattern: ESTABLISHED.*foreign (allowing it anyway)
+[2025-03-22 19:12:26] [WARN] [irf] [44078] Potentially problematic regex pattern: LISTEN.* (allowing it anyway)
+[2025-03-22 19:12:26] [WARN] [irf] [44078] Potentially problematic regex pattern: dig.*txt (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: (tx|rx)_bytes (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: touch.*/tmp/ (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: /dev/shm|/var/tmp (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: rm.*/var/log/ (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: truncate|>.* (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: Linux\.Encoder (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: mirai (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: (echo|printf).*\|.*base64.*\|.*bash (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: (curl|wget).*\|.*bash (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: (curl|wget).*-O.* (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: (bash|nc|python|perl).*-e (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: /tmp/[^[:space:]]+ (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: crontab.*-e (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: /etc/cron (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: authorized_keys (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: (/etc/init|/etc/systemd|rc\.d) (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: at command|atd (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: (\.bashrc|\.bash_profile|\.profile) (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: ESTABLISHED.*foreign (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: LISTEN.* (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: dig.*txt (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: (tx|rx)_bytes (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: touch.*/tmp/ (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: /dev/shm|/var/tmp (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: rm.*/var/log/ (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: truncate|>.* (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: Linux\.Encoder (allowing it anyway)
+[2025-03-22 19:12:27] [WARN] [irf] [44078] Potentially problematic regex pattern: mirai (allowing it anyway)
+[2025-03-22 19:12:28] [WARN] [irf] [44078] Potentially problematic regex pattern: (echo|printf).*\|.*base64.*\|.*bash (allowing it anyway)
+[2025-03-22 19:12:28] [WARN] [irf] [44078] Potentially problematic regex pattern: (curl|wget).*\|.*bash (allowing it anyway)
+[2025-03-22 19:12:28] [WARN] [irf] [44078] Potentially problematic regex pattern: (curl|wget).*-O.* (allowing it anyway)
+[2025-03-22 19:12:28] [WARN] [irf] [44078] Potentially problematic regex pattern: (bash|nc|python|perl).*-e (allowing it anyway)
+[2025-03-22 19:12:28] [WARN] [irf] [44078] Potentially problematic regex pattern: /tmp/[^[:space:]]+ (allowing it anyway)
+[2025-03-22 19:12:28] [WARN] [irf] [44078] Potentially problematic regex pattern: crontab.*-e (allowing it anyway)
+[2025-03-22 19:12:28] [WARN] [irf] [44078] Potentially problematic regex pattern: /etc/cron (allowing it anyway)
+[2025-03-22 19:12:28] [WARN] [irf] [44078] Potentially problematic regex pattern: authorized_keys (allowing it anyway)
+[2025-03-22 19:12:28] [WARN] [irf] [44078] Potentially problematic regex pattern: (/etc/init|/etc/systemd|rc\.d) (allowing it anyway)
+[2025-03-22 19:12:28] [WARN] [irf] [44078] Potentially problematic regex pattern: at command|atd (allowing it anyway)
+[2025-03-22 19:12:28] [WARN] [irf] [44078] Potentially problematic regex pattern: (\.bashrc|\.bash_profile|\.profile) (allowing it anyway)
+[2025-03-22 19:12:28] [WARN] [irf] [44078] Potentially problematic regex pattern: ESTABLISHED.*foreign (allowing it anyway)
+[2025-03-22 19:12:28] [WARN] [irf] [44078] Potentially problematic regex pattern: LISTEN.* (allowing it anyway)
+[2025-03-22 19:12:28] [WARN] [irf] [44078] Potentially problematic regex pattern: dig.*txt (allowing it anyway)
+[2025-03-22 19:12:28] [WARN] [irf] [44078] Potentially problematic regex pattern: (tx|rx)_bytes (allowing it anyway)
+[2025-03-22 19:12:28] [WARN] [irf] [44078] Potentially problematic regex pattern: touch.*/tmp/ (allowing it anyway)
+[2025-03-22 19:12:28] [WARN] [irf] [44078] Potentially problematic regex pattern: /dev/shm|/var/tmp (allowing it anyway)
+[2025-03-22 19:12:28] [WARN] [irf] [44078] Potentially problematic regex pattern: rm.*/var/log/ (allowing it anyway)
+[2025-03-22 19:12:28] [WARN] [irf] [44078] Potentially problematic regex pattern: truncate|>.* (allowing it anyway)
+[2025-03-22 19:12:28] [WARN] [irf] [44078] Potentially problematic regex pattern: Linux\.Encoder (allowing it anyway)
+[2025-03-22 19:12:28] [WARN] [irf] [44078] Potentially problematic regex pattern: mirai (allowing it anyway)
+[2025-03-22 19:12:29] [WARN] [irf] [44078] Potentially problematic regex pattern: (echo|printf).*\|.*base64.*\|.*bash (allowing it anyway)
+[2025-03-22 19:12:29] [WARN] [irf] [44078] Potentially problematic regex pattern: (curl|wget).*\|.*bash (allowing it anyway)
+[2025-03-22 19:12:29] [WARN] [irf] [44078] Potentially problematic regex pattern: (curl|wget).*-O.* (allowing it anyway)
+[2025-03-22 19:12:29] [WARN] [irf] [44078] Potentially problematic regex pattern: (bash|nc|python|perl).*-e (allowing it anyway)
+[2025-03-22 19:12:29] [WARN] [irf] [44078] Potentially problematic regex pattern: /tmp/[^[:space:]]+ (allowing it anyway)
+[2025-03-22 19:12:29] [WARN] [irf] [44078] Potentially problematic regex pattern: crontab.*-e (allowing it anyway)
+[2025-03-22 19:12:29] [WARN] [irf] [44078] Potentially problematic regex pattern: /etc/cron (allowing it anyway)
+[2025-03-22 19:12:29] [WARN] [irf] [44078] Potentially problematic regex pattern: authorized_keys (allowing it anyway)
+[2025-03-22 19:12:29] [WARN] [irf] [44078] Potentially problematic regex pattern: (/etc/init|/etc/systemd|rc\.d) (allowing it anyway)
+[2025-03-22 19:12:29] [WARN] [irf] [44078] Potentially problematic regex pattern: at command|atd (allowing it anyway)
+[2025-03-22 19:12:29] [WARN] [irf] [44078] Potentially problematic regex pattern: (\.bashrc|\.bash_profile|\.profile) (allowing it anyway)
+[2025-03-22 19:12:29] [WARN] [irf] [44078] Potentially problematic regex pattern: ESTABLISHED.*foreign (allowing it anyway)
+[2025-03-22 19:12:29] [WARN] [irf] [44078] Potentially problematic regex pattern: LISTEN.* (allowing it anyway)
+[2025-03-22 19:12:30] [WARN] [irf] [44078] Potentially problematic regex pattern: dig.*txt (allowing it anyway)
+[2025-03-22 19:12:30] [WARN] [irf] [44078] Potentially problematic regex pattern: (tx|rx)_bytes (allowing it anyway)
+[2025-03-22 19:12:30] [WARN] [irf] [44078] Potentially problematic regex pattern: touch.*/tmp/ (allowing it anyway)
+[2025-03-22 19:12:30] [WARN] [irf] [44078] Potentially problematic regex pattern: /dev/shm|/var/tmp (allowing it anyway)
+[2025-03-22 19:12:30] [WARN] [irf] [44078] Potentially problematic regex pattern: rm.*/var/log/ (allowing it anyway)
+[2025-03-22 19:12:30] [WARN] [irf] [44078] Potentially problematic regex pattern: truncate|>.* (allowing it anyway)
+[2025-03-22 19:12:30] [WARN] [irf] [44078] Potentially problematic regex pattern: Linux\.Encoder (allowing it anyway)
+[2025-03-22 19:12:30] [WARN] [irf] [44078] Potentially problematic regex pattern: mirai (allowing it anyway)
+[2025-03-22 19:12:31] [WARN] [irf] [44078] Potentially problematic regex pattern: added to sudoers (allowing it anyway)
+[2025-03-22 19:12:31] [WARN] [irf] [44078] Potentially problematic regex pattern: sudo.*chmod.*777|sudo.*chown|sudo.*dd (allowing it anyway)
+[2025-03-22 19:12:31] [WARN] [irf] [44078] Potentially problematic regex pattern: sudoers changed (allowing it anyway)
+[2025-03-22 19:12:31] [WARN] [irf] [44078] Potentially problematic regex pattern: user NOT in sudoers (allowing it anyway)
+[2025-03-22 19:12:31] [WARN] [irf] [44078] Potentially problematic regex pattern: usermod.*wheel|usermod.*admin|usermod.*root (allowing it anyway)
+[2025-03-22 19:12:31] [WARN] [irf] [44078] Potentially problematic regex pattern: useradd|adduser (allowing it anyway)
+[2025-03-22 19:12:31] [WARN] [irf] [44078] Potentially problematic regex pattern: (useradd|adduser).*-u.*0 (allowing it anyway)
+[2025-03-22 19:12:31] [WARN] [irf] [44078] Potentially problematic regex pattern: groupmod|groupadd (allowing it anyway)
+[2025-03-22 19:12:31] [WARN] [irf] [44078] Potentially problematic regex pattern: chmod.*(/etc/passwd|/etc/shadow|/etc/sudoers) (allowing it anyway)
+[2025-03-22 19:12:31] [WARN] [irf] [44078] Potentially problematic regex pattern: chown.*(/etc/passwd|/etc/shadow|/etc/sudoers) (allowing it anyway)
+[2025-03-22 19:12:31] [WARN] [irf] [44078] Potentially problematic regex pattern: chmod.*[+]s (allowing it anyway)
+[2025-03-22 19:12:31] [WARN] [irf] [44078] Potentially problematic regex pattern: (/tmp|/var/tmp|/dev/shm)/[^[:space:]]+ (allowing it anyway)
+[2025-03-22 19:12:31] [WARN] [irf] [44078] Potentially problematic regex pattern: insmod|modprobe (allowing it anyway)
+[2025-03-22 19:12:31] [WARN] [irf] [44078] Potentially problematic regex pattern: ptrace (allowing it anyway)
+[2025-03-22 19:12:31] [WARN] [irf] [44078] Potentially problematic regex pattern: added to sudoers (allowing it anyway)
+[2025-03-22 19:12:31] [WARN] [irf] [44078] Potentially problematic regex pattern: sudo.*chmod.*777|sudo.*chown|sudo.*dd (allowing it anyway)
+[2025-03-22 19:12:31] [WARN] [irf] [44078] Potentially problematic regex pattern: sudoers changed (allowing it anyway)
+[2025-03-22 19:12:31] [WARN] [irf] [44078] Potentially problematic regex pattern: user NOT in sudoers (allowing it anyway)
+[2025-03-22 19:12:31] [WARN] [irf] [44078] Potentially problematic regex pattern: usermod.*wheel|usermod.*admin|usermod.*root (allowing it anyway)
+[2025-03-22 19:12:31] [WARN] [irf] [44078] Potentially problematic regex pattern: useradd|adduser (allowing it anyway)
+[2025-03-22 19:12:31] [WARN] [irf] [44078] Potentially problematic regex pattern: (useradd|adduser).*-u.*0 (allowing it anyway)
+[2025-03-22 19:12:31] [WARN] [irf] [44078] Potentially problematic regex pattern: groupmod|groupadd (allowing it anyway)
+[2025-03-22 19:12:31] [WARN] [irf] [44078] Potentially problematic regex pattern: chmod.*(/etc/passwd|/etc/shadow|/etc/sudoers) (allowing it anyway)
+[2025-03-22 19:12:31] [WARN] [irf] [44078] Potentially problematic regex pattern: chown.*(/etc/passwd|/etc/shadow|/etc/sudoers) (allowing it anyway)
+[2025-03-22 19:12:31] [WARN] [irf] [44078] Potentially problematic regex pattern: chmod.*[+]s (allowing it anyway)
+[2025-03-22 19:12:31] [WARN] [irf] [44078] Potentially problematic regex pattern: (/tmp|/var/tmp|/dev/shm)/[^[:space:]]+ (allowing it anyway)
+[2025-03-22 19:12:32] [WARN] [irf] [44078] Potentially problematic regex pattern: insmod|modprobe (allowing it anyway)
+[2025-03-22 19:12:32] [WARN] [irf] [44078] Potentially problematic regex pattern: ptrace (allowing it anyway)
+[2025-03-22 19:12:32] [WARN] [irf] [44078] Potentially problematic regex pattern: added to sudoers (allowing it anyway)
+[2025-03-22 19:12:32] [WARN] [irf] [44078] Potentially problematic regex pattern: sudo.*chmod.*777|sudo.*chown|sudo.*dd (allowing it anyway)
+[2025-03-22 19:12:32] [WARN] [irf] [44078] Potentially problematic regex pattern: sudoers changed (allowing it anyway)
+[2025-03-22 19:12:32] [WARN] [irf] [44078] Potentially problematic regex pattern: user NOT in sudoers (allowing it anyway)
+[2025-03-22 19:12:32] [WARN] [irf] [44078] Potentially problematic regex pattern: usermod.*wheel|usermod.*admin|usermod.*root (allowing it anyway)
+[2025-03-22 19:12:32] [WARN] [irf] [44078] Potentially problematic regex pattern: useradd|adduser (allowing it anyway)
+[2025-03-22 19:12:32] [WARN] [irf] [44078] Potentially problematic regex pattern: (useradd|adduser).*-u.*0 (allowing it anyway)
+[2025-03-22 19:12:32] [WARN] [irf] [44078] Potentially problematic regex pattern: groupmod|groupadd (allowing it anyway)
+[2025-03-22 19:12:32] [WARN] [irf] [44078] Potentially problematic regex pattern: chmod.*(/etc/passwd|/etc/shadow|/etc/sudoers) (allowing it anyway)
+[2025-03-22 19:12:32] [WARN] [irf] [44078] Potentially problematic regex pattern: chown.*(/etc/passwd|/etc/shadow|/etc/sudoers) (allowing it anyway)
+[2025-03-22 19:12:32] [WARN] [irf] [44078] Potentially problematic regex pattern: chmod.*[+]s (allowing it anyway)
+[2025-03-22 19:12:32] [WARN] [irf] [44078] Potentially problematic regex pattern: (/tmp|/var/tmp|/dev/shm)/[^[:space:]]+ (allowing it anyway)
+[2025-03-22 19:12:32] [WARN] [irf] [44078] Potentially problematic regex pattern: insmod|modprobe (allowing it anyway)
+[2025-03-22 19:12:32] [WARN] [irf] [44078] Potentially problematic regex pattern: ptrace (allowing it anyway)
+[2025-03-22 19:12:33] [WARN] [irf] [44078] Potentially problematic regex pattern: added to sudoers (allowing it anyway)
+[2025-03-22 19:12:33] [WARN] [irf] [44078] Potentially problematic regex pattern: sudo.*chmod.*777|sudo.*chown|sudo.*dd (allowing it anyway)
+[2025-03-22 19:12:33] [WARN] [irf] [44078] Potentially problematic regex pattern: sudoers changed (allowing it anyway)
+[2025-03-22 19:12:33] [WARN] [irf] [44078] Potentially problematic regex pattern: user NOT in sudoers (allowing it anyway)
+[2025-03-22 19:12:33] [WARN] [irf] [44078] Potentially problematic regex pattern: usermod.*wheel|usermod.*admin|usermod.*root (allowing it anyway)
+[2025-03-22 19:12:33] [WARN] [irf] [44078] Potentially problematic regex pattern: useradd|adduser (allowing it anyway)
+[2025-03-22 19:12:33] [WARN] [irf] [44078] Potentially problematic regex pattern: (useradd|adduser).*-u.*0 (allowing it anyway)
+[2025-03-22 19:12:33] [WARN] [irf] [44078] Potentially problematic regex pattern: groupmod|groupadd (allowing it anyway)
+[2025-03-22 19:12:33] [WARN] [irf] [44078] Potentially problematic regex pattern: chmod.*(/etc/passwd|/etc/shadow|/etc/sudoers) (allowing it anyway)
+[2025-03-22 19:12:33] [WARN] [irf] [44078] Potentially problematic regex pattern: chown.*(/etc/passwd|/etc/shadow|/etc/sudoers) (allowing it anyway)
+[2025-03-22 19:12:33] [WARN] [irf] [44078] Potentially problematic regex pattern: chmod.*[+]s (allowing it anyway)
+[2025-03-22 19:12:33] [WARN] [irf] [44078] Potentially problematic regex pattern: (/tmp|/var/tmp|/dev/shm)/[^[:space:]]+ (allowing it anyway)
+[2025-03-22 19:12:33] [WARN] [irf] [44078] Potentially problematic regex pattern: insmod|modprobe (allowing it anyway)
+[2025-03-22 19:12:33] [WARN] [irf] [44078] Potentially problematic regex pattern: ptrace (allowing it anyway)
+[2025-03-22 19:12:34] [WARN] [irf] [44078] Potentially problematic regex pattern: accepted.*from (allowing it anyway)
+[2025-03-22 19:12:34] [WARN] [irf] [44078] Potentially problematic regex pattern: accepted (allowing it anyway)
+[2025-03-22 19:12:34] [WARN] [irf] [44078] Potentially problematic regex pattern: accepted.*user (allowing it anyway)
+[2025-03-22 19:12:34] [WARN] [irf] [44078] Potentially problematic regex pattern: accepted.*after (allowing it anyway)
+[2025-03-22 19:12:34] [WARN] [irf] [44078] Potentially problematic regex pattern: empty password (allowing it anyway)
+[2025-03-22 19:12:34] [WARN] [irf] [44078] Potentially problematic regex pattern: user.*disabled (allowing it anyway)
+[2025-03-22 19:12:34] [WARN] [irf] [44078] Potentially problematic regex pattern: root (allowing it anyway)
+[2025-03-22 19:12:34] [WARN] [irf] [44078] Potentially problematic regex pattern: accepted.*from (allowing it anyway)
+[2025-03-22 19:12:34] [WARN] [irf] [44078] Potentially problematic regex pattern: /etc/(passwd|shadow|sudoers) (allowing it anyway)
+[2025-03-22 19:12:34] [WARN] [irf] [44078] Potentially problematic regex pattern: permission denied (allowing it anyway)
+[2025-03-22 19:12:34] [WARN] [irf] [44078] Potentially problematic regex pattern: \.db$|\.sql$ (allowing it anyway)
+[2025-03-22 19:12:34] [WARN] [irf] [44078] Potentially problematic regex pattern: \.conf$|\.cfg$|\.ini$ (allowing it anyway)
+[2025-03-22 19:12:34] [WARN] [irf] [44078] Potentially problematic regex pattern: failed.*start (allowing it anyway)
+[2025-03-22 19:12:34] [WARN] [irf] [44078] Potentially problematic regex pattern: failed.*stop (allowing it anyway)
+[2025-03-22 19:12:34] [WARN] [irf] [44078] Potentially problematic regex pattern: connection refused (allowing it anyway)
+[2025-03-22 19:12:34] [WARN] [irf] [44078] Potentially problematic regex pattern: admin|administrator (allowing it anyway)
+[2025-03-22 19:12:34] [WARN] [irf] [44078] Potentially problematic regex pattern: as user (allowing it anyway)
+[2025-03-22 19:12:34] [WARN] [irf] [44078] Potentially problematic regex pattern: as root (allowing it anyway)
+[2025-03-22 19:12:34] [WARN] [irf] [44078] Potentially problematic regex pattern: passwd (allowing it anyway)
+[2025-03-22 19:12:34] [WARN] [irf] [44078] Potentially problematic regex pattern: account locked|too many failures (allowing it anyway)
+[2025-03-22 19:12:34] [WARN] [irf] [44078] Potentially problematic regex pattern: accepted.*from (allowing it anyway)
+[2025-03-22 19:12:34] [WARN] [irf] [44078] Potentially problematic regex pattern: vpn.*connected (allowing it anyway)
+[2025-03-22 19:12:34] [WARN] [irf] [44078] Potentially problematic regex pattern: vpn.*failed (allowing it anyway)
+[2025-03-22 19:12:35] [WARN] [irf] [44078] Potentially problematic regex pattern: accepted.*from (allowing it anyway)
+[2025-03-22 19:12:35] [WARN] [irf] [44078] Potentially problematic regex pattern: accepted (allowing it anyway)
+[2025-03-22 19:12:35] [WARN] [irf] [44078] Potentially problematic regex pattern: accepted.*user (allowing it anyway)
+[2025-03-22 19:12:35] [WARN] [irf] [44078] Potentially problematic regex pattern: accepted.*after (allowing it anyway)
+[2025-03-22 19:12:35] [WARN] [irf] [44078] Potentially problematic regex pattern: empty password (allowing it anyway)
+[2025-03-22 19:12:35] [WARN] [irf] [44078] Potentially problematic regex pattern: user.*disabled (allowing it anyway)
+[2025-03-22 19:12:35] [WARN] [irf] [44078] Potentially problematic regex pattern: root (allowing it anyway)
+[2025-03-22 19:12:35] [WARN] [irf] [44078] Potentially problematic regex pattern: accepted.*from (allowing it anyway)
+[2025-03-22 19:12:35] [WARN] [irf] [44078] Potentially problematic regex pattern: /etc/(passwd|shadow|sudoers) (allowing it anyway)
+[2025-03-22 19:12:35] [WARN] [irf] [44078] Potentially problematic regex pattern: permission denied (allowing it anyway)
+[2025-03-22 19:12:35] [WARN] [irf] [44078] Potentially problematic regex pattern: \.db$|\.sql$ (allowing it anyway)
+[2025-03-22 19:12:35] [WARN] [irf] [44078] Potentially problematic regex pattern: \.conf$|\.cfg$|\.ini$ (allowing it anyway)
+[2025-03-22 19:12:35] [WARN] [irf] [44078] Potentially problematic regex pattern: failed.*start (allowing it anyway)
+[2025-03-22 19:12:35] [WARN] [irf] [44078] Potentially problematic regex pattern: failed.*stop (allowing it anyway)
+[2025-03-22 19:12:35] [WARN] [irf] [44078] Potentially problematic regex pattern: connection refused (allowing it anyway)
+[2025-03-22 19:12:35] [WARN] [irf] [44078] Potentially problematic regex pattern: admin|administrator (allowing it anyway)
+[2025-03-22 19:12:35] [WARN] [irf] [44078] Potentially problematic regex pattern: as user (allowing it anyway)
+[2025-03-22 19:12:35] [WARN] [irf] [44078] Potentially problematic regex pattern: as root (allowing it anyway)
+[2025-03-22 19:12:35] [WARN] [irf] [44078] Potentially problematic regex pattern: passwd (allowing it anyway)
+[2025-03-22 19:12:35] [WARN] [irf] [44078] Potentially problematic regex pattern: account locked|too many failures (allowing it anyway)
+[2025-03-22 19:12:35] [WARN] [irf] [44078] Potentially problematic regex pattern: accepted.*from (allowing it anyway)
+[2025-03-22 19:12:35] [WARN] [irf] [44078] Potentially problematic regex pattern: vpn.*connected (allowing it anyway)
+[2025-03-22 19:12:35] [WARN] [irf] [44078] Potentially problematic regex pattern: vpn.*failed (allowing it anyway)
+[2025-03-22 19:12:36] [WARN] [irf] [44078] Potentially problematic regex pattern: accepted.*from (allowing it anyway)
+[2025-03-22 19:12:36] [WARN] [irf] [44078] Potentially problematic regex pattern: accepted (allowing it anyway)
+[2025-03-22 19:12:36] [WARN] [irf] [44078] Potentially problematic regex pattern: accepted.*user (allowing it anyway)
+[2025-03-22 19:12:36] [WARN] [irf] [44078] Potentially problematic regex pattern: accepted.*after (allowing it anyway)
+[2025-03-22 19:12:36] [WARN] [irf] [44078] Potentially problematic regex pattern: empty password (allowing it anyway)
+[2025-03-22 19:12:36] [WARN] [irf] [44078] Potentially problematic regex pattern: user.*disabled (allowing it anyway)
+[2025-03-22 19:12:36] [WARN] [irf] [44078] Potentially problematic regex pattern: root (allowing it anyway)
+[2025-03-22 19:12:36] [WARN] [irf] [44078] Potentially problematic regex pattern: accepted.*from (allowing it anyway)
+[2025-03-22 19:12:36] [WARN] [irf] [44078] Potentially problematic regex pattern: /etc/(passwd|shadow|sudoers) (allowing it anyway)
+[2025-03-22 19:12:36] [WARN] [irf] [44078] Potentially problematic regex pattern: permission denied (allowing it anyway)
+[2025-03-22 19:12:36] [WARN] [irf] [44078] Potentially problematic regex pattern: \.db$|\.sql$ (allowing it anyway)
+[2025-03-22 19:12:36] [WARN] [irf] [44078] Potentially problematic regex pattern: \.conf$|\.cfg$|\.ini$ (allowing it anyway)
+[2025-03-22 19:12:36] [WARN] [irf] [44078] Potentially problematic regex pattern: failed.*start (allowing it anyway)
+[2025-03-22 19:12:36] [WARN] [irf] [44078] Potentially problematic regex pattern: failed.*stop (allowing it anyway)
+[2025-03-22 19:12:36] [WARN] [irf] [44078] Potentially problematic regex pattern: connection refused (allowing it anyway)
+[2025-03-22 19:12:36] [WARN] [irf] [44078] Potentially problematic regex pattern: admin|administrator (allowing it anyway)
+[2025-03-22 19:12:36] [WARN] [irf] [44078] Potentially problematic regex pattern: as user (allowing it anyway)
+[2025-03-22 19:12:36] [WARN] [irf] [44078] Potentially problematic regex pattern: as root (allowing it anyway)
+[2025-03-22 19:12:36] [WARN] [irf] [44078] Potentially problematic regex pattern: passwd (allowing it anyway)
+[2025-03-22 19:12:36] [WARN] [irf] [44078] Potentially problematic regex pattern: account locked|too many failures (allowing it anyway)
+[2025-03-22 19:12:36] [WARN] [irf] [44078] Potentially problematic regex pattern: accepted.*from (allowing it anyway)
+[2025-03-22 19:12:36] [WARN] [irf] [44078] Potentially problematic regex pattern: vpn.*connected (allowing it anyway)
+[2025-03-22 19:12:36] [WARN] [irf] [44078] Potentially problematic regex pattern: vpn.*failed (allowing it anyway)
+[2025-03-22 19:12:38] [WARN] [irf] [44078] Potentially problematic regex pattern: accepted.*from (allowing it anyway)
+[2025-03-22 19:12:38] [WARN] [irf] [44078] Potentially problematic regex pattern: accepted (allowing it anyway)
+[2025-03-22 19:12:38] [WARN] [irf] [44078] Potentially problematic regex pattern: accepted.*user (allowing it anyway)
+[2025-03-22 19:12:38] [WARN] [irf] [44078] Potentially problematic regex pattern: accepted.*after (allowing it anyway)
+[2025-03-22 19:12:38] [WARN] [irf] [44078] Potentially problematic regex pattern: empty password (allowing it anyway)
+[2025-03-22 19:12:38] [WARN] [irf] [44078] Potentially problematic regex pattern: user.*disabled (allowing it anyway)
+[2025-03-22 19:12:38] [WARN] [irf] [44078] Potentially problematic regex pattern: root (allowing it anyway)
+[2025-03-22 19:12:38] [WARN] [irf] [44078] Potentially problematic regex pattern: accepted.*from (allowing it anyway)
+[2025-03-22 19:12:38] [WARN] [irf] [44078] Potentially problematic regex pattern: /etc/(passwd|shadow|sudoers) (allowing it anyway)
+[2025-03-22 19:12:38] [WARN] [irf] [44078] Potentially problematic regex pattern: permission denied (allowing it anyway)
+[2025-03-22 19:12:38] [WARN] [irf] [44078] Potentially problematic regex pattern: \.db$|\.sql$ (allowing it anyway)
+[2025-03-22 19:12:38] [WARN] [irf] [44078] Potentially problematic regex pattern: \.conf$|\.cfg$|\.ini$ (allowing it anyway)
+[2025-03-22 19:12:38] [WARN] [irf] [44078] Potentially problematic regex pattern: failed.*start (allowing it anyway)
+[2025-03-22 19:12:38] [WARN] [irf] [44078] Potentially problematic regex pattern: failed.*stop (allowing it anyway)
+[2025-03-22 19:12:38] [WARN] [irf] [44078] Potentially problematic regex pattern: connection refused (allowing it anyway)
+[2025-03-22 19:12:38] [WARN] [irf] [44078] Potentially problematic regex pattern: admin|administrator (allowing it anyway)
+[2025-03-22 19:12:38] [WARN] [irf] [44078] Potentially problematic regex pattern: as user (allowing it anyway)
+[2025-03-22 19:12:38] [WARN] [irf] [44078] Potentially problematic regex pattern: as root (allowing it anyway)
+[2025-03-22 19:12:38] [WARN] [irf] [44078] Potentially problematic regex pattern: passwd (allowing it anyway)
+[2025-03-22 19:12:38] [WARN] [irf] [44078] Potentially problematic regex pattern: account locked|too many failures (allowing it anyway)
+[2025-03-22 19:12:38] [WARN] [irf] [44078] Potentially problematic regex pattern: accepted.*from (allowing it anyway)
+[2025-03-22 19:12:38] [WARN] [irf] [44078] Potentially problematic regex pattern: vpn.*connected (allowing it anyway)
+[2025-03-22 19:12:38] [WARN] [irf] [44078] Potentially problematic regex pattern: vpn.*failed (allowing it anyway)

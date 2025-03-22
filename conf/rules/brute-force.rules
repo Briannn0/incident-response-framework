@@ -14,7 +14,7 @@
 # 9 - message
 
 # SSH Failed Password Attempts
-BF-SSH-001;SSH Multiple Failed Password Attempts;Failed password;MEDIUM;7,9
+BF-SSH-001;SSH Multiple Failed Password Attempts;Failed\ password;MEDIUM;7,9
 BF-SSH-002;SSH Authentication Failure;authentication failure;MEDIUM;9
 BF-SSH-003;SSH Invalid User;Invalid user;HIGH;9
 BF-SSH-004;SSH Connection Closed by Invalid User;Connection closed by invalid user;HIGH;9
