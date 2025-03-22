@@ -1,0 +1,48 @@
+version: '3'
+
+services:
+  collector:
+    build:
+      context: ..
+      dockerfile: docker/collector/Dockerfile
+    volumes:
+      - /var/log:/var/log:ro
+      - shared_evidence:/opt/incident-response-framework/evidence
+      - shared_logs:/opt/incident-response-framework/logs
+    restart: unless-stopped
+    networks:
+      - irf-network
+
+  analyzer:
+    build:
+      context: ..
+      dockerfile: docker/analyzer/Dockerfile
+    volumes:
+      - shared_evidence:/opt/incident-response-framework/evidence
+      - shared_logs:/opt/incident-response-framework/logs
+    depends_on:
+      - collector
+    restart: unless-stopped
+    networks:
+      - irf-network
+
+  responder:
+    build:
+      context: ..
+      dockerfile: docker/responder/Dockerfile
+    volumes:
+      - shared_evidence:/opt/incident-response-framework/evidence
+      - shared_logs:/opt/incident-response-framework/logs
+      - /etc/:/etc/:rw  # For response actions that may need to modify system files
+    depends_on:
+      - analyzer
+    restart: unless-stopped
+    networks:
+      - irf-network
+
+volumes:
+  shared_evidence:
+  shared_logs:
+
+networks:
+  irf-network:

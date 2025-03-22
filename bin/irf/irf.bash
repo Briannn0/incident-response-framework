@@ -27,6 +27,7 @@ Usage: irf [COMMAND] [OPTIONS]
 Commands:
   collect  Collect logs from configured sources
   parse    Parse logs into normalized format
+  detect   Detect incidents from normalized logs
   monitor  Start monitoring logs in real-time
   respond  Execute response actions for detected incidents
   test     Test framework components
@@ -83,6 +84,16 @@ case "$COMMAND" in
         
         irf_parse_logs "$@"
         exit $?
+        ;;
+        
+    detect)
+        # Ensure detect binary exists
+        if [[ -x "${IRF_BIN_DIR}/irf-detect" ]]; then
+            exec "${IRF_BIN_DIR}/irf-detect" "$@"
+        else
+            irf_log ERROR "Detect binary not found: ${IRF_BIN_DIR}/irf-detect"
+            exit 1
+        fi
         ;;
         
     monitor)
@@ -163,6 +174,17 @@ case "$COMMAND" in
                     echo "  SOURCE_CONFIG  Path to the log source configuration file"
                     echo "  INPUT_FILE     Path to the input log file (optional)"
                     echo "  OUTPUT_FILE    Path to the output file (optional)"
+                    ;;
+                
+                detect)
+                    echo "Usage: irf detect [OPTIONS]"
+                    echo ""
+                    echo "Detect incidents from normalized logs."
+                    echo ""
+                    echo "Options:"
+                    echo "  --rules FILE   Path to detection rules configuration"
+                    echo "  --input FILE   Path to normalized log input"
+                    echo "  --output FILE  Path to write detection results"
                     ;;
                     
                 monitor)

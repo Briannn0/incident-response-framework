@@ -1,0 +1,31 @@
+# Brute Force Attack Detection Rules
+# Format: RULE_ID;DESCRIPTION;PATTERN;SEVERITY;FIELDS
+#
+# Fields reference (0-based index):
+# 0 - timestamp
+# 1 - source_type
+# 2 - source_name
+# 3 - log_level
+# 4 - username
+# 5 - hostname
+# 6 - ip_address
+# 7 - service
+# 8 - process_id
+# 9 - message
+
+# SSH Failed Password Attempts
+BF-SSH-001;SSH Multiple Failed Password Attempts;Failed password;MEDIUM;7,9
+BF-SSH-002;SSH Authentication Failure;authentication failure;MEDIUM;9
+BF-SSH-003;SSH Invalid User;Invalid user;HIGH;9
+BF-SSH-004;SSH Connection Closed by Invalid User;Connection closed by invalid user;HIGH;9
+
+# Failed sudo attempts
+BF-SUDO-001;Multiple Failed sudo Password Attempts;authentication failure;HIGH;7,9
+BF-SUDO-002;Failed sudo Command Execution;3 incorrect password attempts;HIGH;9
+
+# General Authentication Failures
+BF-AUTH-001;Multiple Failed Login Attempts;failed login;MEDIUM;9
+BF-AUTH-002;PAM Authentication Failure;pam_unix\(.*\): authentication failure;MEDIUM;9
+
+# Rate-based detection
+BF-RATE-001;High Rate of Authentication Failures;authentication failure|Failed password;HIGH;9

@@ -1,0 +1,50 @@
+# Unauthorized Access Detection Rules
+# Format: RULE_ID;DESCRIPTION;PATTERN;SEVERITY;FIELDS
+#
+# Fields reference (0-based index):
+# 0 - timestamp
+# 1 - source_type
+# 2 - source_name
+# 3 - log_level
+# 4 - username
+# 5 - hostname
+# 6 - ip_address
+# 7 - service
+# 8 - process_id
+# 9 - message
+
+# Authentication events
+UA-AUTH-001;Login from Unusual IP;accepted.*from;MEDIUM;6,9
+UA-AUTH-002;Login Outside Business Hours;accepted;MEDIUM;0,9
+UA-AUTH-003;Login to Dormant Account;accepted.*user;HIGH;4,9
+UA-AUTH-004;Successful Login After Multiple Failures;accepted.*after;HIGH;9
+
+# SSH specific
+UA-SSH-001;SSH Login with Empty Password;empty password;HIGH;9
+UA-SSH-002;SSH Login with Disabled Account;user.*disabled;HIGH;9
+UA-SSH-003;SSH Root Login Attempt;root;HIGH;4,9
+UA-SSH-004;SSH Login from External IP Range;accepted.*from;MEDIUM;6,9
+
+# File access
+UA-FILE-001;Sensitive File Access Attempt;/etc/(passwd|shadow|sudoers);HIGH;9
+UA-FILE-002;Unauthorized File Access;permission denied;MEDIUM;9
+UA-FILE-003;Database File Access;\.db$|\.sql$;MEDIUM;9
+UA-FILE-004;Configuration File Modification;\.conf$|\.cfg$|\.ini$;MEDIUM;9
+
+# Service and application access
+UA-SVC-001;Unauthorized Service Start;failed.*start;MEDIUM;9
+UA-SVC-002;Unauthorized Service Stop;failed.*stop;MEDIUM;9
+UA-SVC-003;Unauthorized Port Access;connection refused;LOW;9
+UA-SVC-004;Unauthorized Admin Interface Access;admin|administrator;MEDIUM;9
+
+# Account manipulation
+UA-ACCT-001;Unexpected Account Usage;as user;MEDIUM;9
+UA-ACCT-002;Privileged Account Usage;as root;HIGH;9
+UA-ACCT-003;Password Change Outside Process;passwd;MEDIUM;9
+UA-ACCT-004;Account Lockout;account locked|too many failures;MEDIUM;9
+
+# Network access
+UA-NET-001;Access from Blacklisted IP;accepted.*from;HIGH;6,9
+UA-NET-002;VPN Connection from Unusual Location;vpn.*connected;MEDIUM;9
+UA-NET-003;Multiple Failed VPN Attempts;vpn.*failed;MEDIUM;9
+UA-NET-004;DMZ to Internal Network Access;connection from;MEDIUM;9

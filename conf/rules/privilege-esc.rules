@@ -1,0 +1,39 @@
+# Privilege Escalation Detection Rules
+# Format: RULE_ID;DESCRIPTION;PATTERN;SEVERITY;FIELDS
+#
+# Fields reference (0-based index):
+# 0 - timestamp
+# 1 - source_type
+# 2 - source_name
+# 3 - log_level
+# 4 - username
+# 5 - hostname
+# 6 - ip_address
+# 7 - service
+# 8 - process_id
+# 9 - message
+
+# sudo usage
+PE-SUDO-001;User Added to Sudoers;added to sudoers;CRITICAL;9
+PE-SUDO-002;Suspicious sudo Command;sudo.*chmod.*777|sudo.*chown|sudo.*dd;HIGH;9
+PE-SUDO-003;Sudo Configuration Change;sudoers changed;HIGH;9
+PE-SUDO-004;Unauthorized sudo Attempt;user NOT in sudoers;MEDIUM;9
+
+# User and group modifications
+PE-USER-001;User Added to Admin Group;usermod.*wheel|usermod.*admin|usermod.*root;HIGH;9
+PE-USER-002;New User Creation;useradd|adduser;MEDIUM;9
+PE-USER-003;UID 0 Account Created;(useradd|adduser).*-u.*0;CRITICAL;9
+PE-USER-004;Group Modification;groupmod|groupadd;MEDIUM;9
+
+# Permission and ownership changes
+PE-PERM-001;Critical File Permission Change;chmod.*(/etc/passwd|/etc/shadow|/etc/sudoers);HIGH;9
+PE-PERM-002;Critical File Ownership Change;chown.*(/etc/passwd|/etc/shadow|/etc/sudoers);HIGH;9
+
+# SUID/SGID binaries
+PE-SUID-001;New SUID Binary Created;chmod.*[+]s;HIGH;9
+PE-SUID-002;Suspicious File Execution;(/tmp|/var/tmp|/dev/shm)/[^[:space:]]+;MEDIUM;9
+
+# Kernel and root exploits
+PE-KERN-001;Kernel Module Loading;insmod|modprobe;MEDIUM;9
+PE-KERN-002;Ptrace Syscall Detection;ptrace;HIGH;9
+PE-KERN-003;Capability Modification;setcap|getcap;MEDIUM;9
