@@ -113,19 +113,21 @@ monitor_resources() {
     local pid=$$
     
     # Check CPU usage
-    local cpu_usage
-    cpu_usage=$(ps -p "$pid" -o %cpu | tail -n 1 | tr -d ' ')
+    local cpu_usage=$(ps -p "$pid" -o %cpu | tail -n 1 | tr -d ' ')
+    local mem_usage=$(ps -p "$pid" -o %mem | tail -n 1 | tr -d ' ')
     
-    if (( $(echo "$cpu_usage > 80.0" | bc -l) )); then
-        irf_log WARN "High CPU usage detected: ${cpu_usage}%"
-    fi
-    
-    # Check memory usage
-    local mem_usage
-    mem_usage=$(ps -p "$pid" -o %mem | tail -n 1 | tr -d ' ')
-    
-    if (( $(echo "$mem_usage > 70.0" | bc -l) )); then
-        irf_log WARN "High memory usage detected: ${mem_usage}%"
+    # Determine throttling level
+    if (( $(echo "$cpu_usage > 90.0" | bc -l) )) || (( $(echo "$mem_usage > 90.0" | bc -l) )); then
+        irf_log WARN "Severe resource usage: CPU=${cpu_usage}%, MEM=${mem_usage}%"
+        export IRF_BATCH_SIZE=$((IRF_BATCH_SIZE / 4))
+        sleep 10  # Severe throttling
+    elif (( $(echo "$cpu_usage > 80.0" | bc -l) )) || (( $(echo "$mem_usage > 80.0" | bc -l) )); then
+        irf_log WARN "High resource usage: CPU=${cpu_usage}%, MEM=${mem_usage}%"
+        export IRF_BATCH_SIZE=$((IRF_BATCH_SIZE / 2))
+        sleep 3   # Moderate throttling
+    elif (( $(echo "$cpu_usage > 70.0" | bc -l) )) || (( $(echo "$mem_usage > 70.0" | bc -l) )); then
+        irf_log INFO "Elevated resource usage: CPU=${cpu_usage}%, MEM=${mem_usage}%"
+        sleep 1   # Light throttling
     fi
 }
 

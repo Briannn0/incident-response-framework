@@ -13,6 +13,22 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime, timedelta
 import matplotlib.dates as mdates
+import traceback
+
+def handle_errors(func):
+    """Decorator for standardized error handling"""
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            error_info = {
+                "status": "error",
+                "error_type": type(e).__name__,
+                "error_message": str(e)
+            }
+            sys.stderr.write(json.dumps(error_info) + "\n")
+            sys.exit(1)
+    return wrapper
 
 class SecurityVisualizer:
     def __init__(self, output_dir=None):
@@ -363,25 +379,29 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    visualizer = SecurityVisualizer(args.output)
-    data = visualizer.load_data(args.data, args.format)
-    
-    if args.type == 'timeline':
-        # Generate a timeline visualization of security events
-        visualizer.event_timeline(data, filename='event_timeline.png')
-    elif args.type == 'heatmap':
-        # Create a heatmap showing the frequency of alerts by time and rule
-        visualizer.alert_heatmap(data, filename='alert_heatmap.png')
-    elif args.type == 'distribution':
-        # Generate a bar chart showing the distribution of security rules that triggered alerts
-        visualizer.rule_distribution(data, filename='rule_distribution.png')
-    elif args.type == 'network':
-        # Create a network graph visualization showing communication patterns between IP addresses
-        visualizer.network_graph(data, filename='network_graph.png')
-    elif args.type == 'dashboard':
-        # Generate a comprehensive HTML dashboard containing multiple visualizations of the security data
-        # This combines several visualization types into a single interactive report
-        visualizer.create_dashboard([{'path': args.data, 'format': args.format, 'type': 'alert'}])
+    @handle_errors
+    def main():
+        visualizer = SecurityVisualizer(args.output)
+        data = visualizer.load_data(args.data, args.format)
         
-    # Inform the user where the generated visualization files have been saved
-    print(f"Visualization(s) generated in: {args.output}")
+        if args.type == 'timeline':
+            # Generate a timeline visualization of security events
+            visualizer.event_timeline(data, filename='event_timeline.png')
+        elif args.type == 'heatmap':
+            # Create a heatmap showing the frequency of alerts by time and rule
+            visualizer.alert_heatmap(data, filename='alert_heatmap.png')
+        elif args.type == 'distribution':
+            # Generate a bar chart showing the distribution of security rules that triggered alerts
+            visualizer.rule_distribution(data, filename='rule_distribution.png')
+        elif args.type == 'network':
+            # Create a network graph visualization showing communication patterns between IP addresses
+            visualizer.network_graph(data, filename='network_graph.png')
+        elif args.type == 'dashboard':
+            # Generate a comprehensive HTML dashboard containing multiple visualizations of the security data
+            # This combines several visualization types into a single interactive report
+            visualizer.create_dashboard([{'path': args.data, 'format': args.format, 'type': 'alert'}])
+            
+        # Inform the user where the generated visualization files have been saved
+        print(f"Visualization(s) generated in: {args.output}")
+    
+    main()

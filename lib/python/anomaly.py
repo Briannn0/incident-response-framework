@@ -8,6 +8,7 @@
 import os                  # For working with files and directories
 import sys                 # For system-specific functions
 import json                # For working with JSON data format
+import traceback           # For detailed error information
 
 # Data processing imports - these help analyze and manipulate data
 import pandas as pd        # For data tables (like Excel spreadsheets)
@@ -22,6 +23,21 @@ from sklearn.cluster import DBSCAN            # A method to group similar data
 # This allows us to import other modules from our project
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+def handle_errors(func):
+    """Decorator for standardized error handling"""
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            error_info = {
+                "status": "error",
+                "error_type": type(e).__name__,
+                "error_message": str(e)
+            }
+            sys.stderr.write(json.dumps(error_info) + "\n")
+            sys.exit(1)
+    return wrapper
+
 class AnomalyDetector:
     """A tool that helps find unusual patterns in data."""
     
@@ -35,7 +51,8 @@ class AnomalyDetector:
         self.config = config or {}  # If no config provided, use empty dictionary
         self.data = None            # We'll store the data here once loaded
         self.time_field = self.config.get('time_field', 'timestamp')  # Column name for time values
-        
+    
+    @handle_errors
     def load_data(self, data_file, format='csv'):
         """Read data from a file into memory so we can analyze it.
         
@@ -69,6 +86,7 @@ class AnomalyDetector:
             print(f"Error loading data: {e}")
             return False
     
+    @handle_errors
     def detect_statistical_anomalies(self, fields, output_file=None):
         """Detect anomalies based on statistical methods.
         
@@ -127,6 +145,7 @@ class AnomalyDetector:
         
         return results
     
+    @handle_errors
     def detect_isolation_forest_anomalies(self, fields, contamination=0.05, output_file=None):
         """Detect anomalies using Isolation Forest algorithm.
         
@@ -185,6 +204,7 @@ class AnomalyDetector:
         
         return results
     
+    @handle_errors
     def detect_dbscan_anomalies(self, fields, eps=0.5, min_samples=5, output_file=None):
         """Detect anomalies using DBSCAN clustering algorithm.
         
@@ -250,6 +270,7 @@ class AnomalyDetector:
         
         return results
     
+    @handle_errors
     def run_all_detections(self, fields, output_file=None):
         """Run all anomaly detection methods.
         
@@ -311,27 +332,41 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    detector = AnomalyDetector()
-    
-    if not detector.load_data(args.data, args.format):
-        print("Failed to load data.")
+    try:
+        detector = AnomalyDetector()
+        
+        if not detector.load_data(args.data, args.format):
+            error_info = {
+                "status": "error",
+                "error_type": "DataLoadError",
+                "error_message": "Failed to load data."
+            }
+            sys.stderr.write(json.dumps(error_info) + "\n")
+            sys.exit(1)
+        
+        fields = args.fields.split(',')
+        
+        if args.method == 'statistical' or args.method == 'all':
+            detector.detect_statistical_anomalies(fields, args.output)
+            print(f"Statistical anomaly detection complete. Results saved to {args.output}")
+        
+        if args.method == 'isolation_forest' or args.method == 'all':
+            detector.detect_isolation_forest_anomalies(fields, output_file=args.output)
+            print(f"Isolation Forest anomaly detection complete. Results saved to {args.output}")
+        
+        if args.method == 'dbscan' or args.method == 'all':
+            detector.detect_dbscan_anomalies(fields, output_file=args.output)
+            print(f"DBSCAN anomaly detection complete. Results saved to {args.output}")
+        
+        if args.method == 'all':
+            results = detector.run_all_detections(fields, args.output)
+            print(f"All anomaly detection methods complete. Found {results['summary']['total_anomalies']} anomalies.")
+            print(f"Results saved to {args.output}")
+    except Exception as e:
+        error_info = {
+            "status": "error",
+            "error_type": type(e).__name__,
+            "error_message": str(e)
+        }
+        sys.stderr.write(json.dumps(error_info) + "\n")
         sys.exit(1)
-    
-    fields = args.fields.split(',')
-    
-    if args.method == 'statistical' or args.method == 'all':
-        detector.detect_statistical_anomalies(fields, args.output)
-        print(f"Statistical anomaly detection complete. Results saved to {args.output}")
-    
-    if args.method == 'isolation_forest' or args.method == 'all':
-        detector.detect_isolation_forest_anomalies(fields, output_file=args.output)
-        print(f"Isolation Forest anomaly detection complete. Results saved to {args.output}")
-    
-    if args.method == 'dbscan' or args.method == 'all':
-        detector.detect_dbscan_anomalies(fields, output_file=args.output)
-        print(f"DBSCAN anomaly detection complete. Results saved to {args.output}")
-    
-    if args.method == 'all':
-        results = detector.run_all_detections(fields, args.output)
-        print(f"All anomaly detection methods complete. Found {results['summary']['total_anomalies']} anomalies.")
-        print(f"Results saved to {args.output}")

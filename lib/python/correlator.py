@@ -9,9 +9,25 @@ import json
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
+import traceback
 
 # Add path for other IRF modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+def handle_errors(func):
+    """Decorator for standardized error handling"""
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            error_info = {
+                "status": "error",
+                "error_type": type(e).__name__,
+                "error_message": str(e)
+            }
+            sys.stderr.write(json.dumps(error_info) + "\n")
+            sys.exit(1)
+    return wrapper
 
 class EventCorrelator:
     def __init__(self, config=None):
@@ -238,18 +254,22 @@ class EventCorrelator:
 if __name__ == "__main__":
     import argparse
     
-    parser = argparse.ArgumentParser(description='IRF Event Correlator')
-    parser.add_argument('--events', required=True, help='Path to events file')
-    parser.add_argument('--output', required=True, help='Path to output file')
-    parser.add_argument('--window', type=int, default=300, help='Correlation time window in seconds')
-    args = parser.parse_args()
+    @handle_errors
+    def main():
+        parser = argparse.ArgumentParser(description='IRF Event Correlator')
+        parser.add_argument('--events', required=True, help='Path to events file')
+        parser.add_argument('--output', required=True, help='Path to output file')
+        parser.add_argument('--window', type=int, default=300, help='Correlation time window in seconds')
+        args = parser.parse_args()
+        
+        correlator = EventCorrelator({'correlation_window': args.window})
+        
+        if correlator.load_events(args.events):
+            correlations = correlator.run_all_correlations(args.output)
+            print(f"Found {len(correlations)} correlation groups")
+            print(f"Results saved to {args.output}")
+        else:
+            print("Failed to load events.")
+            sys.exit(1)
     
-    correlator = EventCorrelator({'correlation_window': args.window})
-    
-    if correlator.load_events(args.events):
-        correlations = correlator.run_all_correlations(args.output)
-        print(f"Found {len(correlations)} correlation groups")
-        print(f"Results saved to {args.output}")
-    else:
-        print("Failed to load events.")
-        sys.exit(1)
+    main()

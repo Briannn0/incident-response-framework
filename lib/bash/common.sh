@@ -125,6 +125,50 @@ irf_timestamp() {
 }
 
 #
+# Function: irf_validate_environment
+# Description: Validate the environment for the framework
+# Arguments:
+#   None
+# Returns:
+#   0 if environment is valid, 1 otherwise
+#
+irf_validate_environment() {
+    # Validate and create required directories
+    local required_dirs=(
+        "$IRF_ROOT"
+        "$IRF_LOG_DIR"
+        "$IRF_EVIDENCE_DIR"
+        "$IRF_CONF_DIR"
+    )
+    
+    for dir in "${required_dirs[@]}"; do
+        if [[ ! -d "$dir" ]]; then
+            irf_log INFO "Creating directory: $dir"
+            mkdir -p "$dir" || {
+                irf_log ERROR "Failed to create directory: $dir"
+                return 1
+            }
+        }
+        
+        if [[ ! -w "$dir" ]]; then
+            irf_log ERROR "Directory not writable: $dir"
+            return 1
+        fi
+    done
+    
+    # Check disk space
+    for dir in "$IRF_LOG_DIR" "$IRF_EVIDENCE_DIR"; do
+        local available_space=$(df -k "$dir" | awk 'NR==2 {print $4 * 1024}')
+        if [[ $available_space -lt 104857600 ]]; then # 100MB
+            irf_log ERROR "Insufficient disk space for $dir: $((available_space / 1048576))MB available"
+            return 1
+        fi
+    done
+    
+    return 0
+}
+
+#
 # Function: irf_create_temp_file
 # Description: Create a secure temporary file
 # Arguments:
@@ -152,6 +196,39 @@ irf_cleanup_temp_file() {
         return $?
     fi
     return 0
+}
+
+#
+# Function: irf_with_temp_file
+# Description: Execute a callback with a temporary file that's automatically cleaned up
+# Arguments:
+#   $1 - Callback function to execute with the temporary file
+#   $2 - Prefix for temporary file (optional)
+# Returns:
+#   Exit code from the callback function
+#
+irf_with_temp_file() {
+    local callback="$1"
+    local prefix="${2:-irf}"
+    
+    # Create temporary file
+    local temp_file=$(mktemp "/tmp/${prefix}.XXXXXX") || {
+        irf_log ERROR "Failed to create temporary file"
+        return 1
+    }
+    
+    # Set up cleanup trap
+    trap 'rm -f "$temp_file"' EXIT
+    
+    # Call callback with temporary file
+    "$callback" "$temp_file"
+    local exit_code=$?
+    
+    # Clean up and return exit code
+    rm -f "$temp_file"
+    trap - EXIT
+    
+    return $exit_code
 }
 
 #
@@ -183,6 +260,37 @@ irf_check_dependencies() {
     fi
     
     return $missing
+}
+
+#
+# Function: irf_execute_python_script
+# Description: Execute a Python script and handle error reporting
+# Arguments:
+#   $1 - Path to Python script
+#   $@ - Additional arguments passed to the Python script
+# Returns:
+#   Exit code from the Python script
+#
+irf_execute_python_script() {
+    local script="$1"
+    shift
+    
+    python3 "$script" "$@" 2> >(tee /tmp/python_error.$$.log >&2)
+    local exit_code=$?
+    
+    if [[ $exit_code -ne 0 ]]; then
+        # Extract error message from JSON if available
+        local error_info=$(grep -m1 '{"status":"error"' /tmp/python_error.$$.log 2>/dev/null)
+        if [[ -n "$error_info" ]]; then
+            local error_message=$(echo "$error_info" | python3 -c "import sys,json; print(json.load(sys.stdin).get('error_message', ''))")
+            irf_log ERROR "Python error: $error_message"
+        fi
+        rm -f /tmp/python_error.$$.log
+        return $exit_code
+    fi
+    
+    rm -f /tmp/python_error.$$.log
+    return 0
 }
 
 # Initialize the framework environment

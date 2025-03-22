@@ -146,10 +146,38 @@ irf_collect_log_data() {
     
     # Add locking for file access
     (
-        if ! flock -n 200; then
-            irf_log ERROR "Another process is accessing the log file"
-            return 1
-        fi
+        # Check if lock directory exists and is writable
+        if [[ ! -d "$(dirname "${IRF_LOG_DIR}/.collector_lock")" ]]; then
+            mkdir -p "$(dirname "${IRF_LOG_DIR}/.collector_lock")" || {
+                irf_log ERROR "Failed to create lock directory"
+                return 1
+            }
+        }
+        
+        # Try to acquire lock with timeout
+        local timeout=10
+        local start_time=$(date +%s)
+        
+        while true; do
+            if flock -n 200; then
+                break
+            else
+                # Check if exceeded timeout
+                if [[ $(($(date +%s) - start_time)) -gt $timeout ]]; then
+                    # Check if lock is stale
+                    local lock_pid=$(fuser "${IRF_LOG_DIR}/.collector_lock" 2>/dev/null)
+                    if [[ -z "$lock_pid" ]]; then
+                        irf_log WARN "Detected stale lock, removing and retrying"
+                        rm -f "${IRF_LOG_DIR}/.collector_lock"
+                        continue
+                    else
+                        irf_log ERROR "Failed to acquire lock (held by PID $lock_pid)"
+                        return 1
+                    fi
+                fi
+                sleep 0.5
+            fi
+        done
         
         # Process based on collection method
         case "$COLLECTION_METHOD" in
@@ -251,19 +279,35 @@ irf_setup_realtime_monitoring() {
         return 0
     fi
     
+    # Check inotify limits before monitoring
+    local max_watches
+    max_watches=$(cat /proc/sys/fs/inotify/max_user_watches 2>/dev/null)
+    if [[ -n "$max_watches" && "$max_watches" -lt 8192 ]]; then
+        irf_log WARN "Low inotify watch limit ($max_watches) may cause monitoring issues"
+    fi
+    
     # Set up monitor in the background
     (
         irf_log DEBUG "Starting real-time monitoring for: $log_file"
         
-        # Monitor the file for modifications
-        while inotifywait -q -e modify "$log_file"; do
-            irf_log DEBUG "Detected change in log file: $log_file"
-            
-            # Execute the callback with the log file as argument
-            "$callback" "$log_file" || {
-                irf_log ERROR "Error in monitoring callback for: $log_file"
-                break
-            }
+        local retry_count=0
+        local max_retries=5
+        
+        while [[ $retry_count -lt $max_retries ]]; do
+            # Use timeout to detect hangs
+            if timeout 3600 inotifywait -q -e modify "$log_file"; then
+                irf_log DEBUG "Detected change in log file: $log_file"
+                
+                # Execute the callback with the log file as argument
+                "$callback" "$log_file" || {
+                    irf_log ERROR "Error in monitoring callback for: $log_file"
+                    break
+                }
+            else
+                irf_log WARN "inotifywait exited unexpectedly, restarting monitor"
+                retry_count=$((retry_count + 1))
+                sleep 10
+            fi
         done
         
         irf_log WARN "Real-time monitoring stopped for: $log_file"
@@ -272,6 +316,64 @@ irf_setup_realtime_monitoring() {
     local pid=$!
     irf_log INFO "Started real-time monitoring for $log_file (PID: $pid)"
     return $pid
+}
+
+#
+# Function: irf_process_log_file
+# Description: Process a log file line by line with rotation detection
+# Arguments:
+#   $1 - Log file path
+# Returns:
+#   None
+#
+irf_process_log_file() {
+    local log_file="$1"
+    
+    # Get initial inode to detect rotation
+    local initial_inode=$(stat -c %i "$log_file" 2>/dev/null)
+    
+    # Open file for reading
+    exec 3< "$log_file"
+    
+    while IFS= read -r line <&3; do
+        # Process line...
+        
+        # Periodically check for rotation
+        if [[ $((RANDOM % 100)) -eq 0 ]]; then
+            if [[ -f "$log_file" ]]; then
+                local current_inode=$(stat -c %i "$log_file" 2>/dev/null)
+                
+                if [[ "$current_inode" != "$initial_inode" ]]; then
+                    irf_log INFO "Log rotation detected"
+                    
+                    # Close current file
+                    exec 3<&-
+                    
+                    # Look for rotated file
+                    for rotated in "$log_file.1" "$log_file.0" "$log_file.old"; do
+                        if [[ -f "$rotated" ]]; then
+                            exec 3< "$rotated"
+                            break
+                        fi
+                    done
+                    
+                    # Check for compressed rotated files
+                    for ext in gz bz2 xz; do
+                        if [[ -f "$log_file.1.$ext" ]]; then
+                            case "$ext" in
+                                gz)  exec 3< <(gunzip -c "$log_file.1.$ext") ;;
+                                bz2) exec 3< <(bunzip2 -c "$log_file.1.$ext") ;;
+                                xz)  exec 3< <(unxz -c "$log_file.1.$ext") ;;
+                            esac
+                            break
+                        fi
+                    done
+                fi
+            fi
+        fi
+    done
+    
+    exec 3<&-
 }
 
 #

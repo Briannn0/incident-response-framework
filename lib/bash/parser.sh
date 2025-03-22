@@ -244,6 +244,94 @@ irf_parse_log_file() {
 }
 
 #
+# Function: irf_parse_log_file_chunked
+# Description: Parse a large log file into a normalized format using memory-efficient chunking
+# Arguments:
+#   $1 - Log file to parse
+#   $2 - Log format (syslog, json, custom)
+#   $3 - Log type (auth, syslog, etc.)
+#   $4 - Output file
+#   $5 - Chunk size (optional, default 10000 lines)
+# Returns:
+#   0 if successful, 1 otherwise
+#
+irf_parse_log_file_chunked() {
+    local log_file="$1"
+    local log_format="$2"
+    local log_type="$3"
+    local output_file="$4"
+    local chunk_size="${5:-10000}"  # Process 10,000 lines at a time by default
+    
+    # Validate log file
+    if ! irf_validate_file "$log_file"; then
+        irf_log ERROR "Invalid log file for chunked parsing: $log_file"
+        return 1
+    fi
+    
+    # Write header
+    (IFS=$'\t'; echo "${IRF_FIELDS[*]}") > "$output_file"
+    
+    # Count total lines for progress reporting
+    local total_lines=$(wc -l < "$log_file")
+    irf_log INFO "Starting chunked processing of $total_lines lines from $log_file"
+    
+    # Process in chunks
+    local chunk_start=1  # Start with first line of actual log data
+    local chunk_file=""
+    local line_count=0
+    local return_code=0
+    
+    while true; do
+        # Check memory usage (more portable version)
+        local memory_usage=$(free | grep Mem | awk '{print int($3/$2 * 100)}')
+        if [[ "$memory_usage" -gt 70 ]]; then
+            irf_log WARN "High memory usage: ${memory_usage}%, pausing for 10 seconds"
+            sleep 10
+            continue
+        fi
+        
+        # Create temp file for chunk
+        chunk_file=$(irf_create_temp_file "log_chunk")
+        
+        # Extract chunk of lines
+        sed -n "${chunk_start},$((chunk_start + chunk_size - 1))p" "$log_file" > "$chunk_file"
+        
+        # If chunk is empty, we're done
+        if [[ ! -s "$chunk_file" ]]; then
+            irf_cleanup_temp_file "$chunk_file"
+            break
+        fi
+        
+        # Process chunk
+        while IFS= read -r line; do
+            # Skip empty lines
+            [[ -z "$line" ]] && continue
+            
+            # Parse the line and append to output
+            irf_parse_log_line "$line" "$log_format" "$log_type" >> "$output_file" || {
+                irf_log ERROR "Failed to parse line: ${line:0:100}..."
+                return_code=1
+            }
+            line_count=$((line_count + 1))
+            
+            # Report progress periodically
+            if (( line_count % 5000 == 0 )); then
+                irf_log DEBUG "Processed $line_count/$total_lines lines ($(( line_count * 100 / total_lines ))%)"
+            fi
+        done < "$chunk_file"
+        
+        # Update chunk start position
+        chunk_start=$((chunk_start + chunk_size))
+        
+        # Clean up
+        irf_cleanup_temp_file "$chunk_file"
+    done
+    
+    irf_log INFO "Completed chunked processing of $line_count lines from $log_file"
+    return $return_code
+}
+
+#
 # Function: irf_parse_logs
 # Description: Parse logs from a specific source based on its configuration
 # Arguments:

@@ -13,8 +13,82 @@ import hashlib
 import ipaddress
 import re
 import time
+import random
 from datetime import datetime, timedelta
 import sqlite3
+import traceback
+
+def handle_errors(func):
+    """Decorator for standardized error handling"""
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            error_info = {
+                "status": "error",
+                "error_type": type(e).__name__,
+                "error_message": str(e)
+            }
+            sys.stderr.write(json.dumps(error_info) + "\n")
+            sys.exit(1)
+    return wrapper
+
+def make_api_request(url, headers=None, params=None, timeout=30, max_retries=3):
+    """Make robust API requests with timeouts, retries, and rate limit handling"""
+    headers = headers or {}
+    params = params or {}
+    retry_count = 0
+    backoff_factor = 2.0
+    
+    while retry_count < max_retries:
+        try:
+            # Make request with timeout
+            response = requests.get(
+                url, 
+                headers=headers, 
+                params=params,
+                timeout=timeout
+            )
+            
+            # Handle rate limiting
+            if response.status_code == 429:
+                retry_after = int(response.headers.get('Retry-After', 60))
+                print(f"Rate limited, waiting {retry_after}s")
+                time.sleep(retry_after)
+                retry_count += 1
+                continue
+                
+            # Handle server errors
+            if response.status_code >= 500:
+                print(f"Server error {response.status_code}, retrying")
+                sleep_time = backoff_factor ** retry_count + random.random()
+                time.sleep(sleep_time)
+                retry_count += 1
+                continue
+                
+            # Handle client errors
+            if response.status_code >= 400:
+                print(f"Client error {response.status_code}")
+                return None
+                
+            # Parse JSON with error handling
+            try:
+                return response.json()
+            except ValueError:
+                print("Invalid JSON response")
+                return None
+                
+        except requests.Timeout:
+            print(f"Request timed out after {timeout}s")
+            retry_count += 1
+            time.sleep(backoff_factor ** retry_count)
+            
+        except requests.RequestException as e:
+            print(f"Request failed: {e}")
+            retry_count += 1
+            time.sleep(backoff_factor ** retry_count)
+    
+    return None
 
 class ThreatIntelligence:
     def __init__(self, config=None):
@@ -680,31 +754,35 @@ if __name__ == "__main__":
     
     intel = ThreatIntelligence(config)
     
-    if args.action == 'check-ip':
+    @handle_errors
+    def check_ip_action():
         if not args.indicator:
             print("Error: --indicator is required for check-ip action")
             sys.exit(1)
             
         result = intel.check_ip(args.indicator)
         print(json.dumps(result, indent=2))
-        
-    elif args.action == 'check-domain':
+    
+    @handle_errors
+    def check_domain_action():
         if not args.indicator:
             print("Error: --indicator is required for check-domain action")
             sys.exit(1)
             
         result = intel.check_domain(args.indicator)
         print(json.dumps(result, indent=2))
-        
-    elif args.action == 'check-hash':
+    
+    @handle_errors
+    def check_hash_action():
         if not args.indicator:
             print("Error: --indicator is required for check-hash action")
             sys.exit(1)
             
         result = intel.check_hash(args.indicator)
         print(json.dumps(result, indent=2))
-        
-    elif args.action == 'enrich-alerts':
+    
+    @handle_errors
+    def enrich_alerts_action():
         if not args.alerts:
             print("Error: --alerts is required for enrich-alerts action")
             sys.exit(1)
@@ -720,8 +798,9 @@ if __name__ == "__main__":
         # 5. The enriched alerts can be used for prioritization and further investigation
         result = intel.enrich_alerts(args.alerts, args.output)
         print(f"Enriched alerts saved to: {args.output}")
-        
-    elif args.action == 'update-rules':
+    
+    @handle_errors
+    def update_rules_action():
         # Process CLI command for rule updates:
         # 1. Retrieves all malicious IPs and domains from the local threat intel cache
         # 2. Generates detection rules in the format: RULE_ID;DESCRIPTION;PATTERN;SEVERITY;FIELDS
@@ -732,8 +811,9 @@ if __name__ == "__main__":
         result = intel.update_rules_from_intel()
         print(f"Created {result['ip_rules_count']} IP rules and {result['domain_rules_count']} domain rules")
         print(f"Rules saved to: {result['rules_file']}")
-        
-    elif args.action == 'fetch-feed':
+    
+    @handle_errors
+    def fetch_feed_action():
         if not args.source:
             print("Error: --source is required for fetch-feed action")
             sys.exit(1)
@@ -754,3 +834,20 @@ if __name__ == "__main__":
         else:
             print(f"Downloaded {result['count']} indicators from {result['source']}")
             print(f"Feed saved to: {result['output_file']}")
+    
+    # Map actions to handler functions
+    action_handlers = {
+        'check-ip': check_ip_action,
+        'check-domain': check_domain_action,
+        'check-hash': check_hash_action,
+        'enrich-alerts': enrich_alerts_action,
+        'update-rules': update_rules_action,
+        'fetch-feed': fetch_feed_action
+    }
+    
+    # Execute the appropriate action
+    if args.action in action_handlers:
+        action_handlers[args.action]()
+    else:
+        print(f"Unknown action: {args.action}")
+        sys.exit(1)

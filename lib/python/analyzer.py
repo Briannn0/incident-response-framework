@@ -6,6 +6,7 @@
 import os
 import sys
 import json
+import traceback
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,6 +15,21 @@ from scipy import stats
 
 # Add path for other IRF modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+def handle_errors(func):
+    """Decorator for standardized error handling"""
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            error_info = {
+                "status": "error",
+                "error_type": type(e).__name__,
+                "error_message": str(e)
+            }
+            sys.stderr.write(json.dumps(error_info) + "\n")
+            sys.exit(1)
+    return wrapper
 
 class TimeSeriesAnalyzer:
     def __init__(self, config=None):
@@ -26,28 +42,26 @@ class TimeSeriesAnalyzer:
         # Create figures directory if it doesn't exist
         if not os.path.exists(self.fig_path):
             os.makedirs(self.fig_path, exist_ok=True)
-        
+    
+    @handle_errors
     def load_data(self, data_file, format='csv'):
         """Load data from a file."""
-        try:
-            if format == 'csv':
-                self.data = pd.read_csv(data_file)
-            elif format == 'tsv':
-                self.data = pd.read_csv(data_file, sep='\t')
-            elif format == 'json':
-                self.data = pd.read_json(data_file)
-            else:
-                raise ValueError(f"Unsupported format: {format}")
+        if format == 'csv':
+            self.data = pd.read_csv(data_file)
+        elif format == 'tsv':
+            self.data = pd.read_csv(data_file, sep='\t')
+        elif format == 'json':
+            self.data = pd.read_json(data_file)
+        else:
+            raise ValueError(f"Unsupported format: {format}")
+        
+        # Convert timestamp to datetime
+        if self.time_field in self.data.columns:
+            self.data[self.time_field] = pd.to_datetime(self.data[self.time_field], errors='coerce')
             
-            # Convert timestamp to datetime
-            if self.time_field in self.data.columns:
-                self.data[self.time_field] = pd.to_datetime(self.data[self.time_field], errors='coerce')
-                
-            return True
-        except Exception as e:
-            print(f"Error loading data: {e}")
-            return False
+        return True
     
+    @handle_errors
     def event_frequency_analysis(self, groupby='1H', output_file=None):
         """Analyze event frequency over time."""
         if self.data is None or self.time_field not in self.data.columns:
@@ -90,6 +104,7 @@ class TimeSeriesAnalyzer:
             'data': event_counts.to_dict()
         }
     
+    @handle_errors
     def detect_activity_spikes(self, threshold=2.0, output_file=None):
         """Detect unusual spikes in activity."""
         if self.data is None or self.time_field not in self.data.columns:
@@ -152,6 +167,7 @@ class TimeSeriesAnalyzer:
         
         return results
     
+    @handle_errors
     def attack_sequence_analysis(self, rule_field='RULE_ID', min_sequence=3, max_gap=300, output_file=None):
         """Identify potential attack sequences based on rule patterns and timing."""
         if self.data is None or self.time_field not in self.data.columns or rule_field not in self.data.columns:
@@ -235,28 +251,26 @@ class BaselineProfiler:
         self.time_field = self.config.get('time_field', 'timestamp')
         self.baseline_period = self.config.get('baseline_period', '7D')  # Default 7 days
         self.profiles = {}
-        
+    
+    @handle_errors
     def load_data(self, data_file, format='csv'):
         """Load data from a file."""
-        try:
-            if format == 'csv':
-                self.data = pd.read_csv(data_file)
-            elif format == 'tsv':
-                self.data = pd.read_csv(data_file, sep='\t')
-            elif format == 'json':
-                self.data = pd.read_json(data_file)
-            else:
-                raise ValueError(f"Unsupported format: {format}")
+        if format == 'csv':
+            self.data = pd.read_csv(data_file)
+        elif format == 'tsv':
+            self.data = pd.read_csv(data_file, sep='\t')
+        elif format == 'json':
+            self.data = pd.read_json(data_file)
+        else:
+            raise ValueError(f"Unsupported format: {format}")
+        
+        # Convert timestamp to datetime
+        if self.time_field in self.data.columns:
+            self.data[self.time_field] = pd.to_datetime(self.data[self.time_field], errors='coerce')
             
-            # Convert timestamp to datetime
-            if self.time_field in self.data.columns:
-                self.data[self.time_field] = pd.to_datetime(self.data[self.time_field], errors='coerce')
-                
-            return True
-        except Exception as e:
-            print(f"Error loading data: {e}")
-            return False
+        return True
     
+    @handle_errors
     def create_time_profiles(self, groupby=['hour', 'dayofweek']):
         """Create baseline profiles based on time patterns."""
         if self.data is None or self.time_field not in self.data.columns:
@@ -333,6 +347,7 @@ class BaselineProfiler:
         self.profiles = profiles
         return profiles
     
+    @handle_errors
     def create_user_profiles(self, user_field='username'):
         """Create baseline profiles based on user behavior."""
         if self.data is None or self.time_field not in self.data.columns or user_field not in self.data.columns:
@@ -396,6 +411,7 @@ class BaselineProfiler:
         self.profiles['users'] = user_profiles
         return user_profiles
     
+    @handle_errors
     def detect_anomalies(self, new_data_file, format='tsv', output_file=None):
         """Detect anomalies by comparing new data against baseline profiles."""
         if not self.profiles:
@@ -506,29 +522,23 @@ class BaselineProfiler:
         
         return results
     
+    @handle_errors
     def save_profiles(self, output_file):
         """Save baseline profiles to a file."""
         if not self.profiles:
             print("No profiles to save.")
             return False
             
-        try:
-            with open(output_file, 'w') as f:
-                json.dump(self.profiles, f, indent=2, default=str)
-            return True
-        except Exception as e:
-            print(f"Error saving profiles: {e}")
-            return False
+        with open(output_file, 'w') as f:
+            json.dump(self.profiles, f, indent=2, default=str)
+        return True
     
+    @handle_errors
     def load_profiles(self, profiles_file):
         """Load baseline profiles from a file."""
-        try:
-            with open(profiles_file, 'r') as f:
-                self.profiles = json.load(f)
-            return True
-        except Exception as e:
-            print(f"Error loading profiles: {e}")
-            return False
+        with open(profiles_file, 'r') as f:
+            self.profiles = json.load(f)
+        return True
 
 # Command-line interface
 if __name__ == "__main__":

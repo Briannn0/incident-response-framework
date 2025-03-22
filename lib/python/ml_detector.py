@@ -445,6 +445,21 @@ class MLDetector:
                 
         return models
 
+def handle_errors(func):
+    """Decorator for standardized error handling"""
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            error_info = {
+                "status": "error",
+                "error_type": type(e).__name__,
+                "error_message": str(e)
+            }
+            sys.stderr.write(json.dumps(error_info) + "\n")
+            sys.exit(1)
+    return wrapper
+
 # Command-line interface
 if __name__ == "__main__":
     import argparse
@@ -465,70 +480,75 @@ if __name__ == "__main__":
     
     detector = MLDetector()
     
-    if args.action == 'list-models':
-        models = detector.list_models()
-        print(f"Available models ({len(models)}):")
-        for model in models:
-            print(f" - {model['name']} ({model['type']}), trained on {model['training_date']}")
-        sys.exit(0)
+    @handle_errors
+    def execute_cli_action():
+        if args.action == 'list-models':
+            models = detector.list_models()
+            print(f"Available models ({len(models)}):")
+            for model in models:
+                print(f" - {model['name']} ({model['type']}), trained on {model['training_date']}")
+            return
+        
+        # Load data for all other actions
+        data = detector.load_data(args.data, args.format)
+        
+        if args.action == 'train-anomaly':
+            if not args.fields:
+                print("Error: --fields is required for training")
+                sys.exit(1)
+                
+            fields = args.fields.split(',')
+            result = detector.train_anomaly_detector(data, fields, model_name=args.model)
+            print(f"Anomaly detection model trained and saved as: {result['model_path']}")
+            
+        elif args.action == 'detect-anomaly':
+            result = detector.predict_anomalies(data, model_name=args.model, output_file=args.output)
+            print(f"Found {result['anomaly_count']} anomalies ({result['anomaly_percentage']:.2f}%)")
+            print(f"Results saved to: {args.output}")
+            
+        elif args.action == 'train-classifier':
+            # Additional arguments needed for classification
+            parser.add_argument('--label-field', required=True, help='Field containing class labels')
+            args = parser.parse_args()
+            
+            # Validate required fields parameter
+            if not args.fields:
+                print("Error: --fields is required for training")
+                sys.exit(1)
+                
+            # Parse comma-separated list of feature fields
+            fields = args.fields.split(',')
+            
+            # Train the classifier model using specified fields and label
+            result = detector.train_classifier(data, args.label_field, fields, model_name=args.model)
+            
+            # Output confirmation of successful model training
+            print(f"Classification model trained and saved as: {result['model_path']}")
+            
+        elif args.action == 'classify':
+            # Classify data using the specified model and save results to output file
+            result = detector.predict_classes(data, model_name=args.model, output_file=args.output)
+            
+            # Print summary statistics of the classification results
+            print(f"Classified {result['total_records']} records")
+            print(f"Class distribution: {result['class_distribution']}")
+            print(f"Results saved to: {args.output}")
+            
+        elif args.action == 'cluster':
+            # Validate required fields parameter for clustering
+            if not args.fields:
+                print("Error: --fields is required for clustering")
+                sys.exit(1)
+                
+            # Parse comma-separated list of fields to use for clustering
+            fields = args.fields.split(',')
+            
+            # Perform clustering on the data using the specified fields
+            result = detector.cluster_events(data, fields, output_file=args.output)
+            
+            # Print summary of clustering results
+            print(f"Found {result['num_clusters']} clusters and {result['outliers']} outliers")
+            print(f"Results saved to: {args.output}")
     
-    # Load data for all other actions
-    data = detector.load_data(args.data, args.format)
-    
-    if args.action == 'train-anomaly':
-        if not args.fields:
-            print("Error: --fields is required for training")
-            sys.exit(1)
-            
-        fields = args.fields.split(',')
-        result = detector.train_anomaly_detector(data, fields, model_name=args.model)
-        print(f"Anomaly detection model trained and saved as: {result['model_path']}")
-        
-    elif args.action == 'detect-anomaly':
-        result = detector.predict_anomalies(data, model_name=args.model, output_file=args.output)
-        print(f"Found {result['anomaly_count']} anomalies ({result['anomaly_percentage']:.2f}%)")
-        print(f"Results saved to: {args.output}")
-        
-    elif args.action == 'train-classifier':
-        # Additional arguments needed for classification
-        parser.add_argument('--label-field', required=True, help='Field containing class labels')
-        args = parser.parse_args()
-        
-        # Validate required fields parameter
-        if not args.fields:
-            print("Error: --fields is required for training")
-            sys.exit(1)
-            
-        # Parse comma-separated list of feature fields
-        fields = args.fields.split(',')
-        
-        # Train the classifier model using specified fields and label
-        result = detector.train_classifier(data, args.label_field, fields, model_name=args.model)
-        
-        # Output confirmation of successful model training
-        print(f"Classification model trained and saved as: {result['model_path']}")
-        
-    elif args.action == 'classify':
-        # Classify data using the specified model and save results to output file
-        result = detector.predict_classes(data, model_name=args.model, output_file=args.output)
-        
-        # Print summary statistics of the classification results
-        print(f"Classified {result['total_records']} records")
-        print(f"Class distribution: {result['class_distribution']}")
-        print(f"Results saved to: {args.output}")
-        
-    elif args.action == 'cluster':
-        # Validate required fields parameter for clustering
-        if not args.fields:
-            print("Error: --fields is required for clustering")
-            sys.exit(1)
-            
-        # Parse comma-separated list of fields to use for clustering
-        fields = args.fields.split(',')
-        
-        # Perform clustering on the data using the specified fields
-        result = detector.cluster_events(data, fields, output_file=args.output)
-        
-        # Print summary of clustering results
-        print(f"Found {result['num_clusters']} clusters and {result['outliers']} outliers")
-        print(f"Results saved to: {args.output}")
+    # Execute the CLI action with error handling
+    execute_cli_action()
