@@ -670,10 +670,31 @@ if __name__ == "__main__":
             output_file = os.path.join(args.output, 'anomaly_detection.json')
             results = profiler.detect_anomalies(args.comparison_data, args.format, output_file)
             
+            # Process the anomaly detection results
             if results:
+                # Print a summary of the findings to the console
                 print(f"Anomaly detection complete. Found {results['total_anomalies']} anomalies.")
                 print(f"Results saved to {output_file}")
+                
+                # If there are anomalies found, provide additional information
+                if results['total_anomalies'] > 0:
+                    print("\nSummary of anomalies found:")
+                    print("---------------------------")
+                    severity_count = {"HIGH": 0, "MEDIUM": 0, "LOW": 0}
+                    
+                    # Count anomalies by severity level
+                    for anomaly in results['anomalies']:
+                        severity = anomaly.get('severity', 'MEDIUM')
+                        severity_count[severity] += 1
+                    
+                    # Print the severity breakdown
+                    print(f"HIGH severity: {severity_count['HIGH']}")
+                    print(f"MEDIUM severity: {severity_count['MEDIUM']}")
+                    print(f"LOW severity: {severity_count['LOW']}")
+                    print("\nReview the output file for complete details on each anomaly.")
+                    print("Anomalies indicate unusual patterns that may require investigation.")
             else:
-                print("Anomaly detection failed.")
+                print("Anomaly detection failed. Check that your data and profiles are valid.")
     else:
+        # Show help if no valid analysis type was selected
         parser.print_help()

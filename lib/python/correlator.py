@@ -39,49 +39,52 @@ class EventCorrelator:
         # Convert to pandas DataFrame for easier manipulation
         df = pd.DataFrame(self.events)
         
-        # Group by IP address
+        # Group events by IP address - this creates separate groups for each unique IP
         if 'ip_address' in df.columns:
             ip_groups = df.groupby('ip_address')
             correlated = []
             
             for ip, group in ip_groups:
-                if len(group) > 1:  # If multiple events from same IP
+                if len(group) > 1:  # Check if there are 2 or more events from the same IP address
+                    # Create a dictionary with information about this group of related events
                     correlated.append({
-                        'correlation_type': 'ip_address',
-                        'value': ip,
-                        'event_count': len(group),
-                        'events': group.to_dict('records'),
-                        'severity': self._calculate_severity(group)
+                        'correlation_type': 'ip_address',  # Label showing how these events are related
+                        'value': ip,  # The actual IP address that connects these events
+                        'event_count': len(group),  # How many events came from this IP
+                        'events': group.to_dict('records'),  # All the event details stored as a list
+                        'severity': self._calculate_severity(group)  # How serious this group of events is
                     })
             
-            return correlated
-        return []
+            return correlated  # Return all the groups of related events we found
+        return []  # Return empty list if we couldn't find the IP address column
     
     def correlate_by_time_window(self):
-        """Correlate events that occur within a specified time window."""
+        """Find events that happened close together in time, which might be related."""
         if not self.events:
-            return []
+            return []  # If we have no events, return an empty list
             
         df = pd.DataFrame(self.events)
         
-        # Ensure timestamp column exists and convert to datetime
+        # Check if timestamp column exists and convert text dates to datetime objects
+        # This allows us to perform time calculations and comparisons
         if 'timestamp' in df.columns:
             df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
-            df = df.sort_values('timestamp')
+            df = df.sort_values('timestamp')  # Sort events from earliest to latest
             
-            # Find sequences of events within the time window
-            correlated = []
-            current_sequence = []
+            # Now we'll look for sequences of events that happened within our time window
+            # (The time window is set when creating the correlator object)
+            correlated = []  # This will hold our groups of related events
+            current_sequence = []  # Temporary list to build each group
             
             for i, row in df.iterrows():
                 if not current_sequence:
-                    current_sequence.append(row.to_dict())
+                    current_sequence.append(row.to_dict())  # Start a new sequence with this event
                 else:
                     last_time = pd.to_datetime(current_sequence[-1]['timestamp'])
                     current_time = pd.to_datetime(row['timestamp'])
                     
                     if (current_time - last_time).total_seconds() <= self.correlation_window:
-                        current_sequence.append(row.to_dict())
+                        current_sequence.append(row.to_dict())  # Add event to current sequence
                     else:
                         if len(current_sequence) > 1:
                             correlated.append({
@@ -93,7 +96,7 @@ class EventCorrelator:
                                 'end_time': current_sequence[-1]['timestamp'],
                                 'severity': self._calculate_severity(pd.DataFrame(current_sequence))
                             })
-                        current_sequence = [row.to_dict()]
+                        current_sequence = [row.to_dict()]  # Start a new sequence
             
             # Handle the last sequence
             if len(current_sequence) > 1:

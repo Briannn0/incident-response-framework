@@ -1,38 +1,64 @@
 #!/usr/bin/env python3
 #
 # Statistical anomaly detection module for the Incident Response Framework
-# Provides methods to identify unusual patterns in log data
+# This module helps find unusual or suspicious patterns in log data
+# (An anomaly is something that doesn't follow the normal pattern)
 
-import os
-import sys
-import json
-import pandas as pd
-import numpy as np
-from scipy import stats
-from sklearn.ensemble import IsolationForest
-from sklearn.cluster import DBSCAN
+# Standard library imports - these are built into Python
+import os                  # For working with files and directories
+import sys                 # For system-specific functions
+import json                # For working with JSON data format
 
-# Add path for other IRF modules
+# Data processing imports - these help analyze and manipulate data
+import pandas as pd        # For data tables (like Excel spreadsheets)
+import numpy as np         # For numerical calculations
+
+# Statistical analysis imports - these help find unusual patterns
+from scipy import stats    # For statistical calculations
+from sklearn.ensemble import IsolationForest  # A method to find outliers
+from sklearn.cluster import DBSCAN            # A method to group similar data
+
+# Add our other modules to Python's search path
+# This allows us to import other modules from our project
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 class AnomalyDetector:
+    """A tool that helps find unusual patterns in data."""
+    
     def __init__(self, config=None):
-        """Initialize the anomaly detector with optional configuration."""
-        self.config = config or {}
-        self.data = None
-        self.time_field = self.config.get('time_field', 'timestamp')
+        """Start the detector with optional settings.
+        
+        Args:
+            config: A dictionary with settings (like which column has timestamps)
+                   If None, we'll use default settings.
+        """
+        self.config = config or {}  # If no config provided, use empty dictionary
+        self.data = None            # We'll store the data here once loaded
+        self.time_field = self.config.get('time_field', 'timestamp')  # Column name for time values
         
     def load_data(self, data_file, format='csv'):
-        """Load data from a file."""
+        """Read data from a file into memory so we can analyze it.
+        
+        Args:
+            data_file: Path to the file containing the data
+            format: The type of file ('csv', 'tsv', or 'json')
+                   CSV = Comma Separated Values
+                   TSV = Tab Separated Values
+                   JSON = JavaScript Object Notation
+        
+        Returns:
+            True if data loaded successfully, False otherwise
+        """
         try:
+            # Load the data based on the file format
             if format == 'csv':
-                self.data = pd.read_csv(data_file)
+                self.data = pd.read_csv(data_file)  # Read comma-separated data
             elif format == 'tsv':
-                self.data = pd.read_csv(data_file, sep='\t')
+                self.data = pd.read_csv(data_file, sep='\t')  # Read tab-separated data
             elif format == 'json':
-                self.data = pd.read_json(data_file)
+                self.data = pd.read_json(data_file)  # Read JSON formatted data
             else:
-                raise ValueError(f"Unsupported format: {format}")
+                raise ValueError(f"Unsupported format: {format}")  # Report unsupported format
             
             # Convert timestamp to datetime
             if self.time_field in self.data.columns:
@@ -44,7 +70,15 @@ class AnomalyDetector:
             return False
     
     def detect_statistical_anomalies(self, fields, output_file=None):
-        """Detect anomalies based on statistical methods."""
+        """Detect anomalies based on statistical methods.
+        
+        Args:
+            fields: List of column names to analyze
+            output_file: Path to save the results (optional)
+        
+        Returns:
+            Dictionary with anomaly details
+        """
         if self.data is None:
             return None
             
@@ -94,7 +128,16 @@ class AnomalyDetector:
         return results
     
     def detect_isolation_forest_anomalies(self, fields, contamination=0.05, output_file=None):
-        """Detect anomalies using Isolation Forest algorithm."""
+        """Detect anomalies using Isolation Forest algorithm.
+        
+        Args:
+            fields: List of column names to analyze
+            contamination: Proportion of outliers in the data
+            output_file: Path to save the results (optional)
+        
+        Returns:
+            Dictionary with anomaly details
+        """
         if self.data is None:
             return None
             
@@ -143,7 +186,17 @@ class AnomalyDetector:
         return results
     
     def detect_dbscan_anomalies(self, fields, eps=0.5, min_samples=5, output_file=None):
-        """Detect anomalies using DBSCAN clustering algorithm."""
+        """Detect anomalies using DBSCAN clustering algorithm.
+        
+        Args:
+            fields: List of column names to analyze
+            eps: Maximum distance between two samples for them to be considered as in the same neighborhood
+            min_samples: Number of samples in a neighborhood for a point to be considered as a core point
+            output_file: Path to save the results (optional)
+        
+        Returns:
+            Dictionary with anomaly details
+        """
         if self.data is None:
             return None
             
@@ -198,7 +251,15 @@ class AnomalyDetector:
         return results
     
     def run_all_detections(self, fields, output_file=None):
-        """Run all anomaly detection methods."""
+        """Run all anomaly detection methods.
+        
+        Args:
+            fields: List of column names to analyze
+            output_file: Path to save the results (optional)
+        
+        Returns:
+            Dictionary with combined anomaly details
+        """
         if self.data is None:
             return None
             
