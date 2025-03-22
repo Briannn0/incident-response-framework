@@ -292,6 +292,15 @@ if ! command -v "inotifywait" &>/dev/null; then
     echo "        Install inotify-tools package for real-time monitoring."
 fi
 
+# Install Python dependencies if pip3 is available
+if command -v pip3 &>/dev/null; then
+    pip3 install -r requirements.txt || {
+        echo "WARNING: Failed to install Python dependencies" >&2
+    }
+else
+    echo "WARNING: pip3 not found, Python dependencies not installed" >&2
+fi
+
 if [[ $MISSING -gt 0 ]]; then
     echo "WARNING: Some required dependencies are missing. The framework may not function correctly." >&2
 fi
