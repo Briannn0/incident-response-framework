@@ -32,3 +32,9 @@
 [2025-03-22 16:45:29] [ERROR] [irf] [41001] File does not exist: /var/log/auth.log
 [2025-03-22 16:45:29] [ERROR] [irf] [41001] Invalid input file for parsing: /var/log/auth.log
 [2025-03-22 16:45:29] [ERROR] [irf] [41001] Log parsing failed
+[2025-03-22 18:24:49] [INFO] [irf] [21540] Sample events file created: /workspaces/incident-response-framework/tests/correlation_test/sample_events.tsv
+[2025-03-22 18:24:49] [INFO] [irf] [21540] Testing correlation engine...
+[2025-03-22 18:27:11] [INFO] [irf] [22691] Sample events file created: /workspaces/incident-response-framework/tests/correlation_test/sample_events.tsv
+[2025-03-22 18:27:11] [INFO] [irf] [22691] Testing correlation engine...
+[2025-03-22 18:27:48] [INFO] [irf] [23041] Sample events file created: /workspaces/incident-response-framework/tests/correlation_test/sample_events.tsv
+[2025-03-22 18:27:48] [INFO] [irf] [23041] Testing correlation engine...

@@ -1,0 +1,129 @@
+#!/bin/bash
+#
+# Incident Response Framework (IRF) - Event Correlation Utility
+# This script correlates events across different log sources
+
+# Get the directory where this script is located
+IRF_BIN_DIR=$(dirname "$(readlink -f "$0")")
+IRF_ROOT=$(dirname "$(dirname "$IRF_BIN_DIR")")
+export IRF_ROOT
+
+# Ensure common libraries are loaded
+if [[ ! -f "${IRF_ROOT}/lib/bash/common.sh" ]]; then
+    echo "ERROR: Required library not found: ${IRF_ROOT}/lib/bash/common.sh" >&2
+    exit 1
+fi
+
+# shellcheck source=/dev/null
+source "${IRF_ROOT}/lib/bash/common.sh" || {
+    echo "ERROR: Failed to load common.sh library" >&2
+    exit 1
+}
+
+# Initialize variables
+EVENTS_FILE=""
+OUTPUT_FILE=""
+CORRELATION_WINDOW=300  # Default 5 minutes
+
+# Display usage information
+show_usage() {
+    cat << EOF
+Usage: irf-correlate [OPTIONS]
+
+Correlate security events across different log sources.
+
+Options:
+  --events FILE    Path to normalized events file
+  --output FILE    Path to output file for correlation results
+  --window SECONDS Time window for correlation (default: 300 seconds)
+  --help           Display this help message
+EOF
+}
+
+# Parse command-line arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --events)
+            if [[ -n "$2" ]]; then
+                EVENTS_FILE="$2"
+                shift 2
+            else
+                irf_log ERROR "Missing argument for --events"
+                show_usage
+                exit 1
+            fi
+            ;;
+            
+        --output)
+            if [[ -n "$2" ]]; then
+                OUTPUT_FILE="$2"
+                shift 2
+            else
+                irf_log ERROR "Missing argument for --output"
+                show_usage
+                exit 1
+            fi
+            ;;
+            
+        --window)
+            if [[ -n "$2" ]]; then
+                CORRELATION_WINDOW="$2"
+                shift 2
+            else
+                irf_log ERROR "Missing argument for --window"
+                show_usage
+                exit 1
+            fi
+            ;;
+            
+        --help)
+            show_usage
+            exit 0
+            ;;
+            
+        *)
+            irf_log ERROR "Unknown option: $1"
+            show_usage
+            exit 1
+            ;;
+    esac
+done
+
+# Validate arguments
+if [[ -z "$EVENTS_FILE" ]]; then
+    irf_log ERROR "No events file specified"
+    show_usage
+    exit 1
+fi
+
+if [[ -z "$OUTPUT_FILE" ]]; then
+    irf_log ERROR "No output file specified"
+    show_usage
+    exit 1
+fi
+
+# Check if events file exists
+if [[ ! -f "$EVENTS_FILE" ]]; then
+    irf_log ERROR "Events file does not exist: $EVENTS_FILE"
+    exit 1
+fi
+
+# Check Python availability
+if ! command -v python3 &>/dev/null; then
+    irf_log ERROR "Python 3 is required for correlation but was not found"
+    exit 1
+fi
+
+# Run the Python correlator
+irf_log INFO "Running event correlation with window of $CORRELATION_WINDOW seconds"
+
+python3 "${IRF_ROOT}/lib/python/correlator.py" \
+    --events "$EVENTS_FILE" \
+    --output "$OUTPUT_FILE" \
+    --window "$CORRELATION_WINDOW" || {
+    irf_log ERROR "Event correlation failed"
+    exit 1
+}
+
+irf_log INFO "Event correlation completed. Results saved to: $OUTPUT_FILE"
+exit 0

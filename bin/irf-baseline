@@ -1,0 +1,243 @@
+#!/bin/bash
+#
+# Incident Response Framework (IRF) - Baseline Profiling Utility
+# This script creates and manages baseline behavior profiles
+
+# Get the directory where this script is located
+IRF_BIN_DIR=$(dirname "$(readlink -f "$0")")
+IRF_ROOT=$(dirname "$(dirname "$IRF_BIN_DIR")")
+export IRF_ROOT
+
+# Ensure common libraries are loaded
+if [[ ! -f "${IRF_ROOT}/lib/bash/common.sh" ]]; then
+    echo "ERROR: Required library not found: ${IRF_ROOT}/lib/bash/common.sh" >&2
+    exit 1
+fi
+
+# shellcheck source=/dev/null
+source "${IRF_ROOT}/lib/bash/common.sh" || {
+    echo "ERROR: Failed to load common.sh library" >&2
+    exit 1
+}
+
+# Initialize variables
+ACTION=""
+TRAINING_DATA=""
+PROFILE_FILE="${IRF_EVIDENCE_DIR:-${IRF_ROOT}/evidence}/profiles/baseline_profile.json"
+NEW_DATA=""
+FORMAT="tsv"
+OUTPUT_FILE=""
+
+# Display usage information
+show_usage() {
+    cat << EOF
+Usage: irf-baseline [ACTION] [OPTIONS]
+
+Create and manage baseline behavior profiles for anomaly detection.
+
+Actions:
+  create   Create a new baseline profile
+  detect   Detect anomalies by comparing against a baseline
+  update   Update an existing baseline profile
+
+Options:
+  --data FILE       Path to training data file (for create/update)
+  --profile FILE    Path to profile file (default: evidence/profiles/baseline_profile.json)
+  --new-data FILE   Path to new data file to analyze (for detect)
+  --format FORMAT   Data format: csv, tsv, json (default: tsv)
+  --output FILE     Path to output file for anomalies (default: auto-generated)
+  --help            Display this help message
+EOF
+}
+
+# Parse command-line arguments
+if [[ $# -lt 1 ]]; then
+    show_usage
+    exit 1
+fi
+
+ACTION="$1"
+shift
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --data)
+            if [[ -n "$2" ]]; then
+                TRAINING_DATA="$2"
+                shift 2
+            else
+                irf_log ERROR "Missing argument for --data"
+                show_usage
+                exit 1
+            fi
+            ;;
+            
+        --profile)
+            if [[ -n "$2" ]]; then
+                PROFILE_FILE="$2"
+                shift 2
+            else
+                irf_log ERROR "Missing argument for --profile"
+                show_usage
+                exit 1
+            fi
+            ;;
+            
+        --new-data)
+            if [[ -n "$2" ]]; then
+                NEW_DATA="$2"
+                shift 2
+            else
+                irf_log ERROR "Missing argument for --new-data"
+                show_usage
+                exit 1
+            fi
+            ;;
+            
+        --format)
+            if [[ -n "$2" ]]; then
+                FORMAT="$2"
+                shift 2
+            else
+                irf_log ERROR "Missing argument for --format"
+                show_usage
+                exit 1
+            fi
+            ;;
+            
+        --output)
+            if [[ -n "$2" ]]; then
+                OUTPUT_FILE="$2"
+                shift 2
+            else
+                irf_log ERROR "Missing argument for --output"
+                show_usage
+                exit 1
+            fi
+            ;;
+            
+        --help)
+            show_usage
+            exit 0
+            ;;
+            
+        *)
+            irf_log ERROR "Unknown option: $1"
+            show_usage
+            exit 1
+            ;;
+    esac
+done
+
+# Create profiles directory if it doesn't exist
+PROFILES_DIR=$(dirname "$PROFILE_FILE")
+mkdir -p "$PROFILES_DIR" || {
+    irf_log ERROR "Failed to create profiles directory: $PROFILES_DIR"
+    exit 1
+}
+
+# Process based on action
+case "$ACTION" in
+    create)
+        # Validate training data
+        if [[ -z "$TRAINING_DATA" ]]; then
+            irf_log ERROR "No training data specified"
+            show_usage
+            exit 1
+        fi
+        
+        if [[ ! -f "$TRAINING_DATA" ]]; then
+            irf_log ERROR "Training data file does not exist: $TRAINING_DATA"
+            exit 1
+        fi
+        
+        # Run the Python baseline profiler
+        python3 "${IRF_ROOT}/lib/python/baseline.py" \
+            --action create \
+            --data "$TRAINING_DATA" \
+            --format "$FORMAT" \
+            --output "$PROFILE_FILE" || {
+            irf_log ERROR "Baseline profile creation failed"
+            exit 1
+        }
+        
+        irf_log INFO "Baseline profile created: $PROFILE_FILE"
+        ;;
+        
+    detect)
+        # Validate profile and new data
+        if [[ ! -f "$PROFILE_FILE" ]]; then
+            irf_log ERROR "Profile file does not exist: $PROFILE_FILE"
+            exit 1
+        fi
+        
+        if [[ -z "$NEW_DATA" ]]; then
+            irf_log ERROR "No new data specified"
+            show_usage
+            exit 1
+        fi
+        
+        if [[ ! -f "$NEW_DATA" ]]; then
+            irf_log ERROR "New data file does not exist: $NEW_DATA"
+            exit 1
+        }
+        
+        # Set default output file if not specified
+        if [[ -z "$OUTPUT_FILE" ]]; then
+            OUTPUT_FILE="${IRF_EVIDENCE_DIR:-${IRF_ROOT}/evidence}/analysis/anomalies_$(date +%Y%m%d_%H%M%S).json"
+        fi
+        
+        # Run the Python baseline profiler
+        python3 "${IRF_ROOT}/lib/python/baseline.py" \
+            --action detect \
+            --profile "$PROFILE_FILE" \
+            --data "$NEW_DATA" \
+            --format "$FORMAT" \
+            --output "$OUTPUT_FILE" || {
+            irf_log ERROR "Anomaly detection failed"
+            exit 1
+        }
+        
+        irf_log INFO "Anomaly detection completed. Results saved to: $OUTPUT_FILE"
+        ;;
+        
+    update)
+        # Validate profile and training data
+        if [[ ! -f "$PROFILE_FILE" ]]; then
+            irf_log ERROR "Profile file does not exist: $PROFILE_FILE"
+            exit 1
+        fi
+        
+        if [[ -z "$TRAINING_DATA" ]]; then
+            irf_log ERROR "No training data specified"
+            show_usage
+            exit 1
+        fi
+        
+        if [[ ! -f "$TRAINING_DATA" ]]; then
+            irf_log ERROR "Training data file does not exist: $TRAINING_DATA"
+            exit 1
+        fi
+        
+        # Run the Python baseline profiler
+        python3 "${IRF_ROOT}/lib/python/baseline.py" \
+            --action update \
+            --profile "$PROFILE_FILE" \
+            --data "$TRAINING_DATA" \
+            --format "$FORMAT" \
+            --output "$PROFILE_FILE" || {
+            irf_log ERROR "Baseline profile update failed"
+            exit 1
+        }
+        
+        irf_log INFO "Baseline profile updated: $PROFILE_FILE"
+        ;;
+        
+    *)
+        irf_log ERROR "Unknown action: $ACTION"
+        show_usage
+        exit 1
+        ;;
+esac
+
+exit 0

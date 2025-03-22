@@ -1,0 +1,164 @@
+#!/bin/bash
+#
+# Incident Response Framework (IRF) - Time Series Analysis Utility
+# This script performs time-based analysis on security events
+
+# Get the directory where this script is located
+IRF_BIN_DIR=$(dirname "$(readlink -f "$0")")
+IRF_ROOT=$(dirname "$(dirname "$IRF_BIN_DIR")")
+export IRF_ROOT
+
+# Ensure common libraries are loaded
+if [[ ! -f "${IRF_ROOT}/lib/bash/common.sh" ]]; then
+    echo "ERROR: Required library not found: ${IRF_ROOT}/lib/bash/common.sh" >&2
+    exit 1
+fi
+
+# shellcheck source=/dev/null
+source "${IRF_ROOT}/lib/bash/common.sh" || {
+    echo "ERROR: Failed to load common.sh library" >&2
+    exit 1
+}
+
+# Initialize variables
+DATA_FILE=""
+ANALYSIS_TYPE="all"
+OUTPUT_DIR="${IRF_EVIDENCE_DIR:-${IRF_ROOT}/evidence}/analysis"
+FORMAT="tsv"
+
+# Display usage information
+show_usage() {
+    cat << EOF
+Usage: irf-analyze [OPTIONS]
+
+Perform time-based analysis on security events.
+
+Options:
+  --data FILE        Path to data file (alerts or normalized logs)
+  --format FORMAT    Data format: csv, tsv, json (default: tsv)
+  --type TYPE        Analysis type: frequency, spikes, sequences, all (default: all)
+  --output DIR       Path to output directory (default: evidence/analysis)
+  --help             Display this help message
+
+Analysis-specific options:
+  --groupby INTERVAL Time grouping for frequency analysis (e.g., 1H, 30min)
+  --threshold VALUE  Z-score threshold for spike detection (default: 2.0)
+  --min-sequence NUM Minimum events for sequence detection (default: 3)
+  --max-gap SECONDS  Maximum seconds between events in a sequence (default: 300)
+EOF
+}
+
+# Parse command-line arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --data)
+            if [[ -n "$2" ]]; then
+                DATA_FILE="$2"
+                shift 2
+            else
+                irf_log ERROR "Missing argument for --data"
+                show_usage
+                exit 1
+            fi
+            ;;
+            
+        --format)
+            if [[ -n "$2" ]]; then
+                FORMAT="$2"
+                shift 2
+            else
+                irf_log ERROR "Missing argument for --format"
+                show_usage
+                exit 1
+            fi
+            ;;
+            
+        --type)
+            if [[ -n "$2" ]]; then
+                ANALYSIS_TYPE="$2"
+                shift 2
+            else
+                irf_log ERROR "Missing argument for --type"
+                show_usage
+                exit 1
+            fi
+            ;;
+            
+        --output)
+            if [[ -n "$2" ]]; then
+                OUTPUT_DIR="$2"
+                shift 2
+            else
+                irf_log ERROR "Missing argument for --output"
+                show_usage
+                exit 1
+            fi
+            ;;
+            
+        --help)
+            show_usage
+            exit 0
+            ;;
+            
+        --groupby|--threshold|--min-sequence|--max-gap)
+            # These options will be passed to the Python script
+            EXTRA_ARGS+=("$1" "$2")
+            shift 2
+            ;;
+            
+        *)
+            irf_log ERROR "Unknown option: $1"
+            show_usage
+            exit 1
+            ;;
+    esac
+done
+
+# Validate arguments
+if [[ -z "$DATA_FILE" ]]; then
+    irf_log ERROR "No data file specified"
+    show_usage
+    exit 1
+fi
+
+# Check if data file exists
+if [[ ! -f "$DATA_FILE" ]]; then
+    irf_log ERROR "Data file does not exist: $DATA_FILE"
+    exit 1
+fi
+
+# Validate analysis type
+if [[ "$ANALYSIS_TYPE" != "frequency" && "$ANALYSIS_TYPE" != "spikes" && 
+      "$ANALYSIS_TYPE" != "sequences" && "$ANALYSIS_TYPE" != "all" ]]; then
+    irf_log ERROR "Invalid analysis type: $ANALYSIS_TYPE"
+    show_usage
+    exit 1
+fi
+
+# Create output directory if it doesn't exist
+mkdir -p "$OUTPUT_DIR" || {
+    irf_log ERROR "Failed to create output directory: $OUTPUT_DIR"
+    exit 1
+}
+
+# Check Python availability
+if ! command -v python3 &>/dev/null; then
+    irf_log ERROR "Python 3 is required for analysis but was not found"
+    exit 1
+fi
+
+# Run the Python analyzer
+irf_log INFO "Running time-based analysis: $ANALYSIS_TYPE"
+
+python3 "${IRF_ROOT}/lib/python/analyzer.py" \
+    --data "$DATA_FILE" \
+    --format "$FORMAT" \
+    --output "$OUTPUT_DIR" \
+    --analysis "$ANALYSIS_TYPE" \
+    "${EXTRA_ARGS[@]}" || {
+    irf_log ERROR "Time-based analysis failed"
+    exit 1
+}
+
+irf_log INFO "Analysis completed. Results saved to: $OUTPUT_DIR"
+exit 0

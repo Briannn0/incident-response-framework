@@ -1,0 +1,174 @@
+#!/bin/bash
+#
+# Incident Response Framework (IRF) - Anomaly Detection Utility
+# This script identifies unusual patterns in security logs
+
+# Get the directory where this script is located
+IRF_BIN_DIR=$(dirname "$(readlink -f "$0")")
+IRF_ROOT=$(dirname "$(dirname "$IRF_BIN_DIR")")
+export IRF_ROOT
+
+# Ensure common libraries are loaded
+if [[ ! -f "${IRF_ROOT}/lib/bash/common.sh" ]]; then
+    echo "ERROR: Required library not found: ${IRF_ROOT}/lib/bash/common.sh" >&2
+    exit 1
+fi
+
+# shellcheck source=/dev/null
+source "${IRF_ROOT}/lib/bash/common.sh" || {
+    echo "ERROR: Failed to load common.sh library" >&2
+    exit 1
+}
+
+# Initialize variables
+DATA_FILE=""
+OUTPUT_FILE=""
+FORMAT="tsv"
+FIELDS=""
+METHOD="all"
+
+# Display usage information
+show_usage() {
+    cat << EOF
+Usage: irf-anomaly [OPTIONS]
+
+Detect anomalies in security log data.
+
+Options:
+  --data FILE      Path to data file
+  --output FILE    Path to output file
+  --format FORMAT  Data format: csv, tsv, json (default: tsv)
+  --fields FIELDS  Comma-separated list of fields to analyze
+  --method METHOD  Detection method: statistical, isolation_forest, dbscan, all (default: all)
+  --help           Display this help message
+EOF
+}
+
+# Parse command-line arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --data)
+            if [[ -n "$2" ]]; then
+                DATA_FILE="$2"
+                shift 2
+            else
+                irf_log ERROR "Missing argument for --data"
+                show_usage
+                exit 1
+            fi
+            ;;
+            
+        --output)
+            if [[ -n "$2" ]]; then
+                OUTPUT_FILE="$2"
+                shift 2
+            else
+                irf_log ERROR "Missing argument for --output"
+                show_usage
+                exit 1
+            fi
+            ;;
+            
+        --format)
+            if [[ -n "$2" ]]; then
+                FORMAT="$2"
+                shift 2
+            else
+                irf_log ERROR "Missing argument for --format"
+                show_usage
+                exit 1
+            fi
+            ;;
+            
+        --fields)
+            if [[ -n "$2" ]]; then
+                FIELDS="$2"
+                shift 2
+            else
+                irf_log ERROR "Missing argument for --fields"
+                show_usage
+                exit 1
+            fi
+            ;;
+            
+        --method)
+            if [[ -n "$2" ]]; then
+                METHOD="$2"
+                shift 2
+            else
+                irf_log ERROR "Missing argument for --method"
+                show_usage
+                exit 1
+            fi
+            ;;
+            
+        --help)
+            show_usage
+            exit 0
+            ;;
+            
+        *)
+            irf_log ERROR "Unknown option: $1"
+            show_usage
+            exit 1
+            ;;
+    esac
+done
+
+# Validate arguments
+if [[ -z "$DATA_FILE" ]]; then
+    irf_log ERROR "No data file specified"
+    show_usage
+    exit 1
+fi
+
+if [[ ! -f "$DATA_FILE" ]]; then
+    irf_log ERROR "Data file does not exist: $DATA_FILE"
+    exit 1
+fi
+
+if [[ -z "$OUTPUT_FILE" ]]; then
+    OUTPUT_FILE="${IRF_EVIDENCE_DIR:-${IRF_ROOT}/evidence}/analysis/anomalies_$(date +%Y%m%d_%H%M%S).json"
+fi
+
+if [[ -z "$FIELDS" ]]; then
+    irf_log ERROR "No fields specified for analysis"
+    show_usage
+    exit 1
+fi
+
+# Validate method
+if [[ "$METHOD" != "statistical" && "$METHOD" != "isolation_forest" && 
+      "$METHOD" != "dbscan" && "$METHOD" != "all" ]]; then
+    irf_log ERROR "Invalid method: $METHOD"
+    show_usage
+    exit 1
+fi
+
+# Check Python and required packages
+if ! command -v python3 &>/dev/null; then
+    irf_log ERROR "Python 3 is required for anomaly detection but was not found"
+    exit 1
+fi
+
+# Create output directory if it doesn't exist
+mkdir -p "$(dirname "$OUTPUT_FILE")" || {
+    irf_log ERROR "Failed to create output directory: $(dirname "$OUTPUT_FILE")"
+    exit 1
+}
+
+# Run the Python anomaly detector
+irf_log INFO "Running anomaly detection with method: $METHOD"
+
+python3 "${IRF_ROOT}/lib/python/anomaly.py" \
+    --data "$DATA_FILE" \
+    --format "$FORMAT" \
+    --output "$OUTPUT_FILE" \
+    --fields "$FIELDS" \
+    --method "$METHOD" || {
+    irf_log ERROR "Anomaly detection failed"
+    exit 1
+}
+
+irf_log INFO "Anomaly detection completed. Results saved to: $OUTPUT_FILE"
+exit 0

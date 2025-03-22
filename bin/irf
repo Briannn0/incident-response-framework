@@ -9,7 +9,7 @@ IRF_ROOT=$(dirname "$(dirname "$IRF_BIN_DIR")")
 export IRF_ROOT
 
 # Add version and command validation
-readonly IRF_VALID_COMMANDS=("collect" "parse" "detect" "monitor" "respond" "test" "help")
+readonly IRF_VALID_COMMANDS=("collect" "parse" "detect" "monitor" "respond" "correlate" "analyze" "baseline" "anomaly" "test" "help")
 
 irf_is_valid_command() {
     local cmd="$1"
@@ -43,6 +43,10 @@ Commands:
   detect   Detect incidents from normalized logs
   monitor  Start monitoring logs in real-time
   respond  Execute response actions for detected incidents
+  analyze  Perform time-based analysis on security events
+  correlate Correlate security events across different log sources
+  baseline Create and manage baseline behavior profiles for anomaly detection
+  anomaly  Detect anomalies in security log data
   test     Test framework components
   help     Display this help message
 
@@ -87,7 +91,7 @@ fi
 case "$COMMAND" in
     collect)
         # Check for collector binary
-        COLLECTOR_BIN="${IRF_ROOT}/bin/irf-collector/irf_collector.bash"
+        COLLECTOR_BIN="${IRF_ROOT}/bin/irf-collector"
         if [[ ! -x "$COLLECTOR_BIN" ]]; then
             irf_log ERROR "Collector binary not found or not executable: $COLLECTOR_BIN"
             exit 1
@@ -156,6 +160,58 @@ case "$COMMAND" in
         
         exec "$RESPOND_BIN" "$@" || {
             irf_log ERROR "Failed to execute responder"
+            exit 1
+        }
+        ;;
+        
+    correlate)
+        CORRELATE_BIN="${IRF_ROOT}/bin/irf-correlate"
+        if [[ ! -x "$CORRELATE_BIN" ]]; then
+            irf_log ERROR "Correlate binary not found or not executable: $CORRELATE_BIN"
+            exit 1
+        fi
+        
+        exec "$CORRELATE_BIN" "$@" || {
+            irf_log ERROR "Failed to execute correlator"
+            exit 1
+        }
+        ;;
+        
+    analyze)
+        ANALYZE_BIN="${IRF_ROOT}/bin/irf-analyze"
+        if [[ ! -x "$ANALYZE_BIN" ]]; then
+            irf_log ERROR "Analyze binary not found or not executable: $ANALYZE_BIN"
+            exit 1
+        fi
+        
+        exec "$ANALYZE_BIN" "$@" || {
+            irf_log ERROR "Failed to execute analyzer"
+            exit 1
+        }
+        ;;
+        
+    baseline)
+        BASELINE_BIN="${IRF_ROOT}/bin/irf-baseline"
+        if [[ ! -x "$BASELINE_BIN" ]]; then
+            irf_log ERROR "Baseline binary not found or not executable: $BASELINE_BIN"
+            exit 1
+        fi
+        
+        exec "$BASELINE_BIN" "$@" || {
+            irf_log ERROR "Failed to execute baseline profiler"
+            exit 1
+        }
+        ;;
+        
+    anomaly)
+        ANOMALY_BIN="${IRF_ROOT}/bin/irf-anomaly"
+        if [[ ! -x "$ANOMALY_BIN" ]]; then
+            irf_log ERROR "Anomaly binary not found or not executable: $ANOMALY_BIN"
+            exit 1
+        fi
+        
+        exec "$ANOMALY_BIN" "$@" || {
+            irf_log ERROR "Failed to execute anomaly detector"
             exit 1
         }
         ;;
@@ -250,6 +306,58 @@ case "$COMMAND" in
                     echo "  --incident ID     Respond to a specific incident"
                     echo "  --action NAME     Execute a specific action"
                     echo "  --list            List available response actions"
+                    ;;
+                    
+                correlate)
+                    echo "Usage: irf correlate [OPTIONS]"
+                    echo ""
+                    echo "Correlate security events across different log sources."
+                    echo ""
+                    echo "Options:"
+                    echo "  --events FILE    Path to normalized events file"
+                    echo "  --output FILE    Path to output file for correlation results"
+                    echo "  --window SECONDS Time window for correlation (default: 300 seconds)"
+                    ;;
+                    
+                analyze)
+                    echo "Usage: irf analyze [OPTIONS]"
+                    echo ""
+                    echo "Perform time-based analysis on security events."
+                    echo ""
+                    echo "Options:"
+                    echo "  --data FILE        Path to data file (alerts or normalized logs)"
+                    echo "  --format FORMAT    Data format: csv, tsv, json (default: tsv)"
+                    echo "  --type TYPE        Analysis type: frequency, spikes, sequences, all (default: all)"
+                    echo "  --output DIR       Path to output directory (default: evidence/analysis)"
+                    ;;
+                    
+                baseline)
+                    echo "Usage: irf baseline [ACTION] [OPTIONS]"
+                    echo ""
+                    echo "Create and manage baseline behavior profiles for anomaly detection."
+                    echo ""
+                    echo "Actions:"
+                    echo "  create   Create a new baseline profile"
+                    echo "  detect   Detect anomalies by comparing against a baseline"
+                    echo "  update   Update an existing baseline profile"
+                    echo ""
+                    echo "Options:"
+                    echo "  --data FILE       Path to training data file (for create/update)"
+                    echo "  --profile FILE    Path to profile file (default: evidence/profiles/baseline_profile.json)"
+                    echo "  --new-data FILE   Path to new data file to analyze (for detect)"
+                    ;;
+                    
+                anomaly)
+                    echo "Usage: irf anomaly [OPTIONS]"
+                    echo ""
+                    echo "Detect anomalies in security log data."
+                    echo ""
+                    echo "Options:"
+                    echo "  --data FILE      Path to data file"
+                    echo "  --output FILE    Path to output file"
+                    echo "  --format FORMAT  Data format: csv, tsv, json (default: tsv)"
+                    echo "  --fields FIELDS  Comma-separated list of fields to analyze"
+                    echo "  --method METHOD  Detection method: statistical, isolation_forest, dbscan, all (default: all)"
                     ;;
                     
                 test)
