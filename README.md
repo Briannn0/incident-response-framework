@@ -42,7 +42,7 @@ The framework consists of several core modules working together:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/incident-response-framework.git
+git clone https://github.com/Briannn0/incident-response-framework.git
 cd incident-response-framework
 
 # Run the installation script
@@ -56,7 +56,7 @@ irf --version
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/incident-response-framework.git
+git clone https://github.com/Briannn0/incident-response-framework.git
 cd incident-response-framework
 
 # Build and run with Docker Compose
