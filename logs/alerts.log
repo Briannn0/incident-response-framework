@@ -1,0 +1,21 @@
+[2025-03-25 17:06:17] [ERROR] [irf] [3017] Failed to load detector library
+[2025-03-25 17:16:14] [WARN] [irf] [7743] Potentially problematic regex pattern: bytes=[0-9]{7,} (allowing it anyway)
+[2025-03-25 17:16:14] [WARN] [irf] [7743] Potentially problematic regex pattern: connect.*out.* (allowing it anyway)
+[2025-03-25 17:16:14] [WARN] [irf] [7743] Potentially problematic regex pattern: (tar|zip|gzip|7z) (allowing it anyway)
+[2025-03-25 17:16:14] [WARN] [irf] [7743] Potentially problematic regex pattern: (openssl|gpg|pgp) (allowing it anyway)
+[2025-03-25 17:16:14] [WARN] [irf] [7743] Potentially problematic regex pattern: (iodine|dnscat|dns2tcp) (allowing it anyway)
+[2025-03-25 17:16:14] [ERROR] [irf] [7743] File does not exist: tests/sample-logs/exfil.log
+[2025-03-25 17:16:14] [ERROR] [irf] [7743] Invalid input file for threat detection: tests/sample-logs/exfil.log
+[2025-03-25 17:16:14] [ERROR] [irf] [7743] Detection failed
+[2025-03-25 17:31:51] [WARN] [irf] [14558] Potentially problematic regex pattern: failed login (allowing it anyway)
+[2025-03-25 17:31:51] [ERROR] [irf] [14558] File does not exist: path/to/sample/auth.log
+[2025-03-25 17:31:51] [ERROR] [irf] [14558] Invalid input file for threat detection: path/to/sample/auth.log
+[2025-03-25 17:31:51] [ERROR] [irf] [14558] Detection failed
+[2025-03-25 17:43:47] [WARN] [irf] [21185] Log file does not exist (will be monitored when created): /var/log/auth.log
+[2025-03-25 17:43:47] [WARN] [irf] [21185] Skipping invalid log file: /var/log/auth.log
+[2025-03-25 17:43:47] [WARN] [irf] [21185] Log file does not exist (will be monitored when created): /var/log/secure
+[2025-03-25 17:43:47] [WARN] [irf] [21185] Skipping invalid log file: /var/log/secure
+[2025-03-25 17:49:05] [WARN] [irf] [24580] Log file does not exist (will be monitored when created): /var/log/auth.log
+[2025-03-25 17:49:06] [WARN] [irf] [24580] Skipping invalid log file: /var/log/auth.log
+[2025-03-25 17:49:06] [WARN] [irf] [24580] Log file does not exist (will be monitored when created): /var/log/secure
+[2025-03-25 17:49:06] [WARN] [irf] [24580] Skipping invalid log file: /var/log/secure

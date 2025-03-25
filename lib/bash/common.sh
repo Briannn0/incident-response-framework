@@ -169,7 +169,7 @@ irf_generate_checksum() {
 #
 irf_verify_file_integrity() {
     local file_path="$1"
-    local expected_checksum="$2"
+    local expected_checksum="${2:-}"
     local checksum_file="${IRF_EVIDENCE_DIR}/checksums/$(basename "$file_path").sha256"
     
     # Create checksums directory if it doesn't exist

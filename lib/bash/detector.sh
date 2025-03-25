@@ -557,7 +557,7 @@ irf_detect_threats() {
                     fi
                     ;;
                 USERNAME)
-                    if [[ "$log_line" =~ user[=: ] ]]; then
+                    if [[ "$log_line" =~ (user[=: ]) ]]; then
                         types_to_check+=("$type_name")
                     fi
                     ;;

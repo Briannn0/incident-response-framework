@@ -1,0 +1,86 @@
+[2025-03-25 17:06:17] [ERROR] [irf] [3017] Failed to load detector library
+[2025-03-25 17:07:29] [INFO] [irf] [3625] Generating comprehensive sample log data in /tmp/irf_test_RoOOi3/sample_logs
+[2025-03-25 17:07:29] [INFO] [irf] [3625] Generated comprehensive test scenarios:
+[2025-03-25 17:07:29] [INFO] [irf] [3625]   - apt_scenario.log: 10 log entries
+[2025-03-25 17:07:29] [INFO] [irf] [3625]   - data_exfil.log: 8 log entries
+[2025-03-25 17:07:29] [INFO] [irf] [3625]   - malware_activity.log: 5 log entries
+[2025-03-25 17:07:29] [INFO] [irf] [3625]   - privilege_escalation.log: 5 log entries
+[2025-03-25 17:07:29] [INFO] [irf] [3625]   - ssh_brute_force.log: 6 log entries
+[2025-03-25 17:07:29] [INFO] [irf] [3625]   - unauthorized_access.log: 5 log entries
+[2025-03-25 17:07:29] [INFO] [irf] [3625]   - web_attack.log: 10 log entries
+[2025-03-25 17:07:29] [INFO] [irf] [3625] Sample logs generated in: /tmp/irf_test_RoOOi3/sample_logs
+[2025-03-25 17:14:17] [INFO] [irf] [6721] Testing rule file: data-exfil.rules
+[2025-03-25 17:14:17] [INFO] [irf] [6721] Against log file: exfil.log
+[2025-03-25 17:16:13] [INFO] [irf] [7743] Testing rule file: data-exfil.rules
+[2025-03-25 17:16:13] [INFO] [irf] [7743] Against log file: exfil.log
+[2025-03-25 17:16:13] [INFO] [irf] [7743] Stored initial checksum for conf/rules/data-exfil.rules
+[2025-03-25 17:16:14] [WARN] [irf] [7743] Potentially problematic regex pattern: bytes=[0-9]{7,} (allowing it anyway)
+[2025-03-25 17:16:14] [WARN] [irf] [7743] Potentially problematic regex pattern: connect.*out.* (allowing it anyway)
+[2025-03-25 17:16:14] [WARN] [irf] [7743] Potentially problematic regex pattern: (tar|zip|gzip|7z) (allowing it anyway)
+[2025-03-25 17:16:14] [WARN] [irf] [7743] Potentially problematic regex pattern: (openssl|gpg|pgp) (allowing it anyway)
+[2025-03-25 17:16:14] [WARN] [irf] [7743] Potentially problematic regex pattern: (iodine|dnscat|dns2tcp) (allowing it anyway)
+[2025-03-25 17:16:14] [INFO] [irf] [7743] Loaded 6 rules from conf/rules/data-exfil.rules
+[2025-03-25 17:16:14] [ERROR] [irf] [7743] File does not exist: tests/sample-logs/exfil.log
+[2025-03-25 17:16:14] [ERROR] [irf] [7743] Invalid input file for threat detection: tests/sample-logs/exfil.log
+[2025-03-25 17:16:14] [ERROR] [irf] [7743] Detection failed
+[2025-03-25 17:31:37] [INFO] [irf] [14296] Generating comprehensive sample log data in /tmp/irf_test_hfJQ00/sample_logs
+[2025-03-25 17:31:37] [INFO] [irf] [14296] Generated comprehensive test scenarios:
+[2025-03-25 17:31:37] [INFO] [irf] [14296]   - apt_scenario.log: 10 log entries
+[2025-03-25 17:31:37] [INFO] [irf] [14296]   - data_exfil.log: 8 log entries
+[2025-03-25 17:31:37] [INFO] [irf] [14296]   - malware_activity.log: 5 log entries
+[2025-03-25 17:31:37] [INFO] [irf] [14296]   - privilege_escalation.log: 5 log entries
+[2025-03-25 17:31:37] [INFO] [irf] [14296]   - ssh_brute_force.log: 6 log entries
+[2025-03-25 17:31:37] [INFO] [irf] [14296]   - unauthorized_access.log: 5 log entries
+[2025-03-25 17:31:37] [INFO] [irf] [14296]   - web_attack.log: 10 log entries
+[2025-03-25 17:31:37] [INFO] [irf] [14296] Sample logs generated in: /tmp/irf_test_hfJQ00/sample_logs
+[2025-03-25 17:31:51] [INFO] [irf] [14558] Testing rule file: brute-force.rules
+[2025-03-25 17:31:51] [INFO] [irf] [14558] Against log file: auth.log
+[2025-03-25 17:31:51] [INFO] [irf] [14558] Stored initial checksum for conf/rules/brute-force.rules
+[2025-03-25 17:31:51] [WARN] [irf] [14558] Potentially problematic regex pattern: failed login (allowing it anyway)
+[2025-03-25 17:31:51] [INFO] [irf] [14558] Loaded 8 rules from conf/rules/brute-force.rules
+[2025-03-25 17:31:51] [ERROR] [irf] [14558] File does not exist: path/to/sample/auth.log
+[2025-03-25 17:31:51] [ERROR] [irf] [14558] Invalid input file for threat detection: path/to/sample/auth.log
+[2025-03-25 17:31:51] [ERROR] [irf] [14558] Detection failed
+[2025-03-25 17:43:47] [INFO] [irf] [21185] Discovered 4 enabled log sources
+[2025-03-25 17:43:47] [WARN] [irf] [21185] Log file does not exist (will be monitored when created): /var/log/auth.log
+[2025-03-25 17:43:47] [WARN] [irf] [21185] Skipping invalid log file: /var/log/auth.log
+[2025-03-25 17:43:47] [WARN] [irf] [21185] Log file does not exist (will be monitored when created): /var/log/secure
+[2025-03-25 17:43:47] [WARN] [irf] [21185] Skipping invalid log file: /var/log/secure
+[2025-03-25 17:43:47] [INFO] [irf] [21185] Successfully collected logs for source: auth
+[2025-03-25 17:44:58] [INFO] [irf] [22069] Generating comprehensive sample log data in tests/sample_logs
+[2025-03-25 17:44:58] [INFO] [irf] [22069] Generated comprehensive test scenarios:
+[2025-03-25 17:44:58] [INFO] [irf] [22069]   - apt_scenario.log: 10 log entries
+[2025-03-25 17:44:58] [INFO] [irf] [22069]   - data_exfil.log: 8 log entries
+[2025-03-25 17:44:58] [INFO] [irf] [22069]   - malware_activity.log: 5 log entries
+[2025-03-25 17:44:58] [INFO] [irf] [22069]   - privilege_escalation.log: 5 log entries
+[2025-03-25 17:44:58] [INFO] [irf] [22069]   - ssh_brute_force.log: 6 log entries
+[2025-03-25 17:44:58] [INFO] [irf] [22069]   - unauthorized_access.log: 5 log entries
+[2025-03-25 17:44:58] [INFO] [irf] [22069]   - web_attack.log: 10 log entries
+[2025-03-25 17:44:58] [INFO] [irf] [22069] Sample logs generated in: tests/sample_logs
+[2025-03-25 17:45:15] [INFO] [irf] [22383] Generating comprehensive sample log data in tests/sample_logs
+[2025-03-25 17:45:15] [INFO] [irf] [22383] Generated comprehensive test scenarios:
+[2025-03-25 17:45:15] [INFO] [irf] [22383]   - apt_scenario.log: 10 log entries
+[2025-03-25 17:45:15] [INFO] [irf] [22383]   - data_exfil.log: 8 log entries
+[2025-03-25 17:45:15] [INFO] [irf] [22383]   - malware_activity.log: 5 log entries
+[2025-03-25 17:45:15] [INFO] [irf] [22383]   - privilege_escalation.log: 5 log entries
+[2025-03-25 17:45:15] [INFO] [irf] [22383]   - ssh_brute_force.log: 6 log entries
+[2025-03-25 17:45:15] [INFO] [irf] [22383]   - unauthorized_access.log: 5 log entries
+[2025-03-25 17:45:15] [INFO] [irf] [22383]   - web_attack.log: 10 log entries
+[2025-03-25 17:45:15] [INFO] [irf] [22383] Sample logs generated in: tests/sample_logs
+[2025-03-25 17:48:18] [INFO] [irf] [23923] Generating comprehensive sample log data in tests/sample_logs
+[2025-03-25 17:48:18] [INFO] [irf] [23923] Generated comprehensive test scenarios:
+[2025-03-25 17:48:18] [INFO] [irf] [23923]   - apt_scenario.log: 10 log entries
+[2025-03-25 17:48:18] [INFO] [irf] [23923]   - data_exfil.log: 8 log entries
+[2025-03-25 17:48:18] [INFO] [irf] [23923]   - malware_activity.log: 5 log entries
+[2025-03-25 17:48:18] [INFO] [irf] [23923]   - privilege_escalation.log: 5 log entries
+[2025-03-25 17:48:18] [INFO] [irf] [23923]   - ssh_brute_force.log: 6 log entries
+[2025-03-25 17:48:18] [INFO] [irf] [23923]   - unauthorized_access.log: 5 log entries
+[2025-03-25 17:48:18] [INFO] [irf] [23923]   - web_attack.log: 10 log entries
+[2025-03-25 17:48:18] [INFO] [irf] [23923] Sample logs generated in: tests/sample_logs
+[2025-03-25 17:49:05] [INFO] [irf] [24580] Discovered 4 enabled log sources
+[2025-03-25 17:49:05] [WARN] [irf] [24580] Log file does not exist (will be monitored when created): /var/log/auth.log
+[2025-03-25 17:49:06] [WARN] [irf] [24580] Skipping invalid log file: /var/log/auth.log
+[2025-03-25 17:49:06] [WARN] [irf] [24580] Log file does not exist (will be monitored when created): /var/log/secure
+[2025-03-25 17:49:06] [WARN] [irf] [24580] Skipping invalid log file: /var/log/secure
+[2025-03-25 17:49:06] [INFO] [irf] [24580] Successfully collected logs for source: auth
+[2025-03-25 17:51:49] [INFO] [irf] [25882] Successfully collected logs for source: auth
