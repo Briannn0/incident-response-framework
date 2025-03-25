@@ -14,6 +14,199 @@ import traceback
 # Add path for other IRF modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+class PatternEngine:
+    """Flexible pattern matching engine for attack sequences."""
+    
+    def __init__(self):
+        self.patterns = {}
+        
+    def add_pattern(self, pattern_id, pattern_def):
+        """Add a pattern definition to the engine.
+        
+        Args:
+            pattern_id: Unique identifier for the pattern
+            pattern_def: Dictionary containing pattern definition
+                {
+                    'name': 'Pattern name',
+                    'sequence': [
+                        {'rule_pattern': 'BF-.*', 'min_count': 3, 'max_time': 300},
+                        {'rule_pattern': 'PE-.*', 'min_count': 1, 'max_time': 1800}
+                    ],
+                    'conditions': [
+                        'same_ip_address',
+                        'same_username'
+                    ],
+                    'max_gap': 3600,
+                    'severity': 'HIGH'
+                }
+        """
+        self.patterns[pattern_id] = pattern_def
+        
+    def load_patterns_from_file(self, pattern_file):
+        """Load pattern definitions from a JSON file."""
+        try:
+            with open(pattern_file, 'r') as f:
+                patterns = json.load(f)
+                for pattern_id, pattern_def in patterns.items():
+                    self.add_pattern(pattern_id, pattern_def)
+            return True
+        except Exception as e:
+            print(f"Error loading patterns: {e}")
+            return False
+            
+    def match_sequences(self, events_df):
+        """Find sequences matching defined patterns in event data.
+        
+        Args:
+            events_df: DataFrame containing event data
+            
+        Returns:
+            List of dictionaries with matched patterns
+        """
+        matches = []
+        
+        for pattern_id, pattern in self.patterns.items():
+            # Find events matching each step in the sequence
+            sequence_matches = self._match_sequence_steps(events_df, pattern)
+            
+            if sequence_matches:
+                for match in sequence_matches:
+                    matches.append({
+                        'pattern_id': pattern_id,
+                        'pattern_name': pattern['name'],
+                        'events': match['events'],
+                        'start_time': match['start_time'],
+                        'end_time': match['end_time'],
+                        'duration_seconds': match['duration_seconds'],
+                        'confidence': match['confidence'],
+                        'severity': pattern.get('severity', 'MEDIUM')
+                    })
+                    
+        return matches
+        
+    def _match_sequence_steps(self, events_df, pattern):
+        """Match the sequence steps defined in a pattern."""
+        if 'timestamp' not in events_df.columns or 'RULE_ID' not in events_df.columns:
+            return []
+            
+        # Sort events by timestamp
+        events_df = events_df.sort_values('timestamp')
+        events_df['timestamp'] = pd.to_datetime(events_df['timestamp'])
+        
+        # Find events matching each step
+        sequence_steps = pattern.get('sequence', [])
+        step_matches = []
+        
+        for step in sequence_steps:
+            rule_pattern = step.get('rule_pattern', '.*')
+            min_count = step.get('min_count', 1)
+            
+            # Find events matching this step's rule pattern
+            matching_events = events_df[events_df['RULE_ID'].str.match(rule_pattern)]
+            
+            if len(matching_events) >= min_count:
+                step_matches.append({
+                    'rule_pattern': rule_pattern,
+                    'events': matching_events.to_dict('records')
+                })
+            else:
+                # Not enough matches for this step
+                return []
+                
+        # Check if we found matches for all steps
+        if len(step_matches) != len(sequence_steps):
+            return []
+            
+        # Check conditions like same_ip_address, same_username
+        conditions = pattern.get('conditions', [])
+        
+        # Find valid sequences that satisfy all conditions
+        sequences = self._find_valid_sequences(step_matches, conditions, pattern.get('max_gap', 3600))
+        
+        return sequences
+        
+    def _find_valid_sequences(self, step_matches, conditions, max_gap):
+        """Find valid sequences that satisfy all conditions."""
+        # Start with the first step events
+        sequences = []
+        
+        for first_event in step_matches[0]['events']:
+            # Try to build a sequence starting with this event
+            sequence = [first_event]
+            
+            # Track if we can complete the sequence
+            valid_sequence = self._extend_sequence(sequence, step_matches[1:], conditions, max_gap)
+            
+            if valid_sequence:
+                # Calculate sequence metrics
+                start_time = pd.to_datetime(sequence[0]['timestamp'])
+                end_time = pd.to_datetime(sequence[-1]['timestamp'])
+                duration = (end_time - start_time).total_seconds()
+                
+                # Add to valid sequences
+                sequences.append({
+                    'events': sequence,
+                    'start_time': str(start_time),
+                    'end_time': str(end_time),
+                    'duration_seconds': duration,
+                    'confidence': 1.0  # Perfect match
+                })
+                
+        return sequences
+        
+    def _extend_sequence(self, current_sequence, remaining_steps, conditions, max_gap):
+        """Recursively extend a sequence with remaining steps."""
+        if not remaining_steps:
+            return True
+            
+        # Get the last event in the current sequence
+        last_event = current_sequence[-1]
+        last_time = pd.to_datetime(last_event['timestamp'])
+        
+        # Try to find a matching event from the next step
+        for next_event in remaining_steps[0]['events']:
+            next_time = pd.to_datetime(next_event['timestamp'])
+            
+            # Check time gap constraint
+            if (next_time - last_time).total_seconds() > max_gap:
+                continue
+                
+            # Check all conditions
+            if self._check_conditions(current_sequence, next_event, conditions):
+                # Add this event to the sequence
+                extended_sequence = current_sequence + [next_event]
+                
+                # Try to extend with the rest of the steps
+                if self._extend_sequence(extended_sequence, remaining_steps[1:], conditions, max_gap):
+                    # Update the current_sequence in place
+                    current_sequence[:] = extended_sequence
+                    return True
+                    
+        return False
+        
+    def _check_conditions(self, current_sequence, candidate_event, conditions):
+        """Check if a candidate event satisfies all conditions with the current sequence."""
+        for condition in conditions:
+            if condition == 'same_ip_address':
+                if 'ip_address' not in candidate_event:
+                    return False
+                    
+                for event in current_sequence:
+                    if 'ip_address' not in event or event['ip_address'] != candidate_event['ip_address']:
+                        return False
+                        
+            elif condition == 'same_username':
+                if 'username' not in candidate_event:
+                    return False
+                    
+                for event in current_sequence:
+                    if 'username' not in event or event['username'] != candidate_event['username']:
+                        return False
+                        
+            # Add more conditions as needed
+                
+        return True
+
 def handle_errors(func):
     """Decorator for standardized error handling"""
     def wrapper(*args, **kwargs):
@@ -35,6 +228,35 @@ class EventCorrelator:
         self.config = config or {}
         self.events = []
         self.correlation_window = self.config.get('correlation_window', 300)  # 5 minutes default
+        self.pattern_engine = PatternEngine()
+        
+        # Load patterns from config if provided
+        pattern_file = self.config.get('pattern_file')
+        if pattern_file:
+            self.pattern_engine.load_patterns_from_file(pattern_file)
+        else:
+            # Add default patterns
+            self.pattern_engine.add_pattern('brute_force_to_privilege', {
+                'name': 'Brute Force to Privilege Escalation',
+                'sequence': [
+                    {'rule_pattern': 'BF-.*', 'min_count': 3, 'max_time': 300},
+                    {'rule_pattern': 'PE-.*', 'min_count': 1, 'max_time': 1800}
+                ],
+                'conditions': ['same_ip_address'],
+                'max_gap': 3600,
+                'severity': 'HIGH'
+            })
+            
+            self.pattern_engine.add_pattern('unauthorized_to_malware', {
+                'name': 'Unauthorized Access to Malware Execution',
+                'sequence': [
+                    {'rule_pattern': 'UA-.*', 'min_count': 1},
+                    {'rule_pattern': 'MW-.*', 'min_count': 1}
+                ],
+                'conditions': ['same_ip_address'],
+                'max_gap': 1800,
+                'severity': 'HIGH'
+            })
         
     def load_events(self, events_file):
         """Load detected events from a file."""
@@ -130,38 +352,94 @@ class EventCorrelator:
         return []
     
     def correlate_by_attack_chain(self):
-        """Identify potential attack chains based on event types and sequence."""
+        """Identify potential attack chains using the flexible pattern engine."""
         if not self.events:
             return []
             
+        # Convert to pandas DataFrame
         df = pd.DataFrame(self.events)
         
-        # Define known attack chain patterns
-        attack_patterns = [
-            {
-                'name': 'Brute Force to Privilege Escalation',
-                'steps': ['BF-', 'PE-'],
-                'max_time_gap': 3600  # 1 hour between steps
-            },
-            {
-                'name': 'Unauthorized Access to Malware Execution',
-                'steps': ['UA-', 'MW-'],
-                'max_time_gap': 1800  # 30 minutes between steps
-            }
-        ]
+        # Use the pattern engine to find matches
+        matches = self.pattern_engine.match_sequences(df)
         
+        # Format results for compatibility with other correlation methods
         correlated_chains = []
         
-        for pattern in attack_patterns:
-            # Try to identify this pattern in the events
-            chain = self._find_attack_chain(df, pattern)
-            if chain:
-                correlated_chains.append(chain)
-                
+        for match in matches:
+            correlated_chains.append({
+                'correlation_type': 'attack_chain',
+                'pattern_name': match['pattern_name'],
+                'events': match['events'],
+                'start_time': match['start_time'],
+                'end_time': match['end_time'],
+                'duration_seconds': match['duration_seconds'],
+                'severity': match['severity']
+            })
+            
         return correlated_chains
     
+    def save_checkpoint(self, checkpoint_id=None):
+        """Save the current state for recovery.
+        
+        Args:
+            checkpoint_id: Optional checkpoint identifier
+            
+        Returns:
+            Checkpoint ID
+        """
+        if checkpoint_id is None:
+            checkpoint_id = f"correlator_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            
+        checkpoint_dir = os.path.join(os.environ.get('IRF_ROOT', '.'), 'checkpoints')
+        os.makedirs(checkpoint_dir, exist_ok=True)
+        
+        # Save current state
+        checkpoint_data = {
+            'events': self.events,
+            'correlation_window': self.correlation_window,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        checkpoint_file = os.path.join(checkpoint_dir, f"{checkpoint_id}.json")
+        with open(checkpoint_file, 'w') as f:
+            json.dump(checkpoint_data, f, default=str)
+            
+        print(f"Created checkpoint: {checkpoint_id}")
+        return checkpoint_id
+
+    def restore_checkpoint(self, checkpoint_id):
+        """Restore state from a checkpoint.
+        
+        Args:
+            checkpoint_id: Checkpoint identifier
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        checkpoint_dir = os.path.join(os.environ.get('IRF_ROOT', '.'), 'checkpoints')
+        checkpoint_file = os.path.join(checkpoint_dir, f"{checkpoint_id}.json")
+        
+        if not os.path.exists(checkpoint_file):
+            print(f"Checkpoint not found: {checkpoint_id}")
+            return False
+            
+        try:
+            with open(checkpoint_file, 'r') as f:
+                checkpoint_data = json.load(f)
+                
+            self.events = checkpoint_data.get('events', [])
+            self.correlation_window = checkpoint_data.get('correlation_window', 300)
+            
+            print(f"Restored checkpoint: {checkpoint_id}")
+            return True
+        except Exception as e:
+            print(f"Error restoring checkpoint: {e}")
+            return False
+    
     def _find_attack_chain(self, df, pattern):
-        """Helper method to identify a specific attack chain pattern."""
+        """Legacy method for backward compatibility."""
+        # This method is kept for backward compatibility
+        # New code should use pattern_engine directly
         if 'RULE_ID' not in df.columns or 'timestamp' not in df.columns:
             return None
             

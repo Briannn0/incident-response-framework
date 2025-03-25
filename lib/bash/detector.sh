@@ -22,6 +22,11 @@ declare -a IRF_LOADED_RULES=()
 declare -A IRF_SEVERITY_LEVELS
 IRF_SEVERITY_LEVELS=([INFO]=10 [LOW]=20 [MEDIUM]=30 [HIGH]=40 [CRITICAL]=50)
 
+# Add metadata support
+declare -A IRF_RULE_CATEGORIES # Maps category names to arrays of rule IDs
+declare -A IRF_RULE_TAGS # Maps tag names to arrays of rule IDs
+declare -A IRF_RULE_FILE_METADATA # Maps rule file names to metadata
+
 #
 # Function: irf_validate_pattern
 # Description: Validate a regex pattern for correctness
@@ -58,6 +63,52 @@ irf_validate_pattern() {
 }
 
 #
+# Function: irf_parse_rule_metadata
+# Description: Parse rule file metadata
+# Arguments:
+#   $1 - Rule file path
+# Returns:
+#   0 if successful, 1 otherwise
+#
+irf_parse_rule_metadata() {
+    local rule_file="$1"
+    local version=""
+    local category=""
+    local tags=""
+    local last_updated=""
+    local author=""
+    
+    # Read the file header
+    while IFS= read -r line; do
+        # Stop when we reach a non-comment line
+        [[ "$line" =~ ^[^#] ]] && break
+        
+        # Parse metadata
+        if [[ "$line" =~ ^#\ *Version:\ *(.*) ]]; then
+            version="${BASH_REMATCH[1]}"
+        elif [[ "$line" =~ ^#\ *Category:\ *(.*) ]]; then
+            category="${BASH_REMATCH[1]}"
+        elif [[ "$line" =~ ^#\ *Tags:\ *(.*) ]]; then
+            tags="${BASH_REMATCH[1]}"
+        elif [[ "$line" =~ ^#\ *Last\ updated:\ *(.*) ]]; then
+            last_updated="${BASH_REMATCH[1]}"
+        elif [[ "$line" =~ ^#\ *Author:\ *(.*) ]]; then
+            author="${BASH_REMATCH[1]}"
+        fi
+    done < "$rule_file"
+    
+    # Store the metadata
+    local rule_base=$(basename "$rule_file" .rules)
+    IRF_RULE_FILE_METADATA["$rule_base.version"]="$version"
+    IRF_RULE_FILE_METADATA["$rule_base.category"]="$category"
+    IRF_RULE_FILE_METADATA["$rule_base.tags"]="$tags"
+    IRF_RULE_FILE_METADATA["$rule_base.last_updated"]="$last_updated"
+    IRF_RULE_FILE_METADATA["$rule_base.author"]="$author"
+    
+    return 0
+}
+
+#
 # Function: irf_load_rule_file
 # Description: Load rules from a rule file
 # Arguments:
@@ -75,6 +126,19 @@ irf_load_rule_file() {
         irf_log ERROR "Invalid rule file: $rule_file"
         return 1
     fi
+    
+    if ! irf_verify_file_integrity "$rule_file"; then
+        irf_log ERROR "Integrity check failed for rule file: $rule_file"
+        return 1
+    fi
+    
+    # Parse metadata
+    irf_parse_rule_metadata "$rule_file"
+    
+    # Get rule file basename for metadata reference
+    local rule_base=$(basename "$rule_file" .rules)
+    local category="${IRF_RULE_FILE_METADATA["$rule_base.category"]:-Unknown}"
+    local tags="${IRF_RULE_FILE_METADATA["$rule_base.tags"]:-}"
     
     # Add rate limiting for alerts
     local timestamp
@@ -103,6 +167,24 @@ irf_load_rule_file() {
         
         # Store the rule in the global array
         IRF_LOADED_RULES+=("$line")
+        
+        # Add rule to category index
+        if [[ -n "$category" && "$category" != "Unknown" ]]; then
+            IRF_RULE_CATEGORIES["$category"]+=" $id"
+        fi
+        
+        # Add rule to tag indices
+        if [[ -n "$tags" ]]; then
+            IFS=',' read -ra tag_array <<< "$tags"
+            for tag in "${tag_array[@]}"; do
+                # Trim whitespace
+                tag=$(echo "$tag" | xargs)
+                if [[ -n "$tag" ]]; then
+                    IRF_RULE_TAGS["$tag"]+=" $id"
+                fi
+            done
+        fi
+        
         rule_count=$((rule_count + 1))
     done < "$rule_file"
     
@@ -134,8 +216,11 @@ irf_load_all_rules() {
     local loaded=0
     local failed=0
     
-    # Clear the rules array
+    # Clear the rules array and metadata structures
     IRF_LOADED_RULES=()
+    IRF_RULE_CATEGORIES=()
+    IRF_RULE_TAGS=()
+    IRF_RULE_FILE_METADATA=()
     
     # Validate rules directory
     if [[ ! -d "$rules_dir" ]]; then
@@ -165,12 +250,52 @@ irf_load_all_rules() {
 }
 
 #
+# Function: irf_index_rules
+# Description: Index rules by pattern type for faster matching
+# Arguments:
+#   None
+# Returns:
+#   0 if successful
+#
+irf_index_rules() {
+    # Clear existing indexes
+    declare -A IRF_RULE_INDEX
+    declare -a IRF_RULE_TYPES
+    
+    # Common pattern types to index
+    local pattern_types=(
+        "IP_ADDRESS" "([0-9]{1,3}\.){3}[0-9]{1,3}"
+        "USERNAME" "user[=: ]"
+        "AUTH_FAILURE" "auth.*fail|fail.*password"
+        "ROOT_ACCESS" "root"
+        "SUDO" "sudo"
+    )
+    
+    # Build the index
+    for type_info in "${pattern_types[@]}"; do
+        read -r type_name type_pattern <<< "$type_info"
+        IRF_RULE_TYPES+=("$type_name")
+        
+        # Find rules matching this type
+        for rule in "${IRF_LOADED_RULES[@]}"; do
+            IFS=';' read -r id description pattern severity fields <<< "$rule"
+            if [[ "$pattern" =~ $type_pattern ]]; then
+                IRF_RULE_INDEX["${type_name}#${id}"]="$rule"
+            fi
+        done
+    done
+    
+    irf_log DEBUG "Indexed ${#IRF_RULE_INDEX[@]} rules into ${#IRF_RULE_TYPES[@]} categories"
+    return 0
+}
+
+#
 # Function: irf_parse_rule
 # Description: Parse a rule into its components
 # Arguments:
 #   $1 - Rule string
 # Returns:
-#   Sets global variables RULE_ID, RULE_DESCRIPTION, RULE_PATTERN, RULE_SEVERITY, RULE_FIELDS
+#   Sets global variables RULE_ID, RULE_DESCRIPTION, RULE_PATTERN, RULE_SEVERITY, RULE_FIELDS, RULE_TAGS
 #
 irf_parse_rule() {
     local rule="$1"
@@ -181,9 +306,10 @@ irf_parse_rule() {
     RULE_PATTERN=""
     RULE_SEVERITY="MEDIUM"  # Default severity
     RULE_FIELDS=""
+    RULE_TAGS=""
     
-    # Expected format: ID;DESCRIPTION;PATTERN;SEVERITY;FIELDS
-    IFS=';' read -r RULE_ID RULE_DESCRIPTION RULE_PATTERN RULE_SEVERITY RULE_FIELDS <<< "$rule"
+    # Expected format: ID;DESCRIPTION;PATTERN;SEVERITY;FIELDS;TAGS
+    IFS=';' read -r RULE_ID RULE_DESCRIPTION RULE_PATTERN RULE_SEVERITY RULE_FIELDS RULE_TAGS <<< "$rule"
     
     # Validate required fields
     if [[ -z "$RULE_ID" || -z "$RULE_PATTERN" ]]; then
@@ -195,6 +321,19 @@ irf_parse_rule() {
     if [[ -n "$RULE_SEVERITY" && -z "${IRF_SEVERITY_LEVELS[$RULE_SEVERITY]:-}" ]]; then
         irf_log WARN "Invalid severity level in rule $RULE_ID: $RULE_SEVERITY, using MEDIUM"
         RULE_SEVERITY="MEDIUM"
+    fi
+    
+    # Clean up tags
+    if [[ -n "$RULE_TAGS" ]]; then
+        # Split tags and index them
+        IFS=',' read -ra tags <<< "$RULE_TAGS"
+        for tag in "${tags[@]}"; do
+            tag=$(echo "$tag" | xargs) # Trim whitespace
+            if [[ -n "$tag" ]]; then
+                # Add to the tag index
+                IRF_RULE_TAGS["$tag"]="${IRF_RULE_TAGS["$tag"]} $RULE_ID"
+            fi
+        done
     fi
     
     return 0
@@ -286,6 +425,11 @@ irf_detect_threats() {
         }
     fi
     
+    # Index rules if not already indexed
+    if [[ ${#IRF_RULE_INDEX[@]} -eq 0 ]]; then
+        irf_index_rules
+    fi
+    
     # Process each log line
     local line_count=0
     while IFS= read -r log_line; do
@@ -295,20 +439,68 @@ irf_detect_threats() {
             continue
         fi
         
-        # Apply each rule to the log line
-        for rule in "${IRF_LOADED_RULES[@]}"; do
-            if irf_apply_rule "$rule" "$log_line"; then
-                # Match found - write alert
-                echo -e "${RULE_ID}\t${RULE_SEVERITY}\t${RULE_DESCRIPTION}\t${log_line}" >> "$output_file"
-                match_count=$((match_count + 1))
-                
-                # Log the alert
-                irf_log WARN "Rule match: ${RULE_ID} - ${RULE_DESCRIPTION}"
-                
-                # Break after first match for efficiency (optional)
-                # break
-            fi
+        # Determine which rule types to check based on log content
+        local types_to_check=()
+        for type_name in "${IRF_RULE_TYPES[@]}"; do
+            case "$type_name" in
+                IP_ADDRESS)
+                    if [[ "$log_line" =~ ([0-9]{1,3}\.){3}[0-9]{1,3} ]]; then
+                        types_to_check+=("$type_name")
+                    fi
+                    ;;
+                USERNAME)
+                    if [[ "$log_line" =~ user[=: ] ]]; then
+                        types_to_check+=("$type_name")
+                    fi
+                    ;;
+                AUTH_FAILURE)
+                    if [[ "$log_line" =~ (auth.*fail|fail.*password) ]]; then
+                        types_to_check+=("$type_name")
+                    fi
+                    ;;
+                ROOT_ACCESS)
+                    if [[ "$log_line" =~ root ]]; then
+                        types_to_check+=("$type_name")
+                    fi
+                    ;;
+                SUDO)
+                    if [[ "$log_line" =~ sudo ]]; then
+                        types_to_check+=("$type_name")
+                    fi
+                    ;;
+            esac
         done
+        
+        # If no specific types matched, check all rules
+        if [[ ${#types_to_check[@]} -eq 0 ]]; then
+            for rule in "${IRF_LOADED_RULES[@]}"; do
+                if irf_apply_rule "$rule" "$log_line"; then
+                    # Match found - write alert
+                    echo -e "${RULE_ID}\t${RULE_SEVERITY}\t${RULE_DESCRIPTION}\t${log_line}" >> "$output_file"
+                    match_count=$((match_count + 1))
+                    
+                    # Log the alert
+                    irf_log WARN "Rule match: ${RULE_ID} - ${RULE_DESCRIPTION}"
+                fi
+            done
+        else
+            # Apply only relevant rules based on the indexed types
+            for type_name in "${types_to_check[@]}"; do
+                for key in "${!IRF_RULE_INDEX[@]}"; do
+                    if [[ "$key" =~ ^${type_name}# ]]; then
+                        local rule="${IRF_RULE_INDEX[$key]}"
+                        if irf_apply_rule "$rule" "$log_line"; then
+                            # Match found - write alert
+                            echo -e "${RULE_ID}\t${RULE_SEVERITY}\t${RULE_DESCRIPTION}\t${log_line}" >> "$output_file"
+                            match_count=$((match_count + 1))
+                            
+                            # Log the alert
+                            irf_log WARN "Rule match: ${RULE_ID} - ${RULE_DESCRIPTION}"
+                        fi
+                    fi
+                done
+            done
+        fi
         
         line_count=$((line_count + 1))
     done < "$input_file"

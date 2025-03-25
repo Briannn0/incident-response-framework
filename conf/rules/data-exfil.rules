@@ -1,0 +1,16 @@
+# Data Exfiltration Detection Rules
+# Version: 1.0
+# Last updated: 2025-03-25
+# Format: RULE_ID;DESCRIPTION;PATTERN;SEVERITY;FIELDS
+
+# Large data transfers
+DE-NET-001;Unusual Large Outbound Transfer;bytes=[0-9]{7,};HIGH;9
+DE-NET-002;Outbound Connection to Untrusted Host;connect.*out.*;MEDIUM;9
+
+# Suspicious commands
+DE-CMD-001;Data Compression Before Transfer;(tar|zip|gzip|7z);MEDIUM;9
+DE-CMD-002;Data Encryption Before Transfer;(openssl|gpg|pgp);MEDIUM;9
+
+# Common exfiltration tools
+DE-TOOL-001;Data Exfiltration Tool Detected;(nc|netcat|cryptcat|socat);HIGH;9
+DE-TOOL-002;DNS Tunneling Tool;(iodine|dnscat|dns2tcp);CRITICAL;9

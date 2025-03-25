@@ -87,14 +87,14 @@ irf_rotate_logs() {
             done
             
             # Rotate the main log
-            mv "$log_file" "${log_file}.1" || {
-                echo "ERROR: Failed to rotate main log file: $log_file" >&2
+            cp "$log_file" "${log_file}.1" || {
+                irf_log ERROR "Failed to copy log file during rotation: $log_file"
                 return 1
             }
             
-            # Create a new log file
-            touch "$log_file" || {
-                echo "ERROR: Failed to create new log file: $log_file" >&2
+            # Truncate the original file
+            : > "$log_file" || {
+                irf_log ERROR "Failed to truncate log file after rotation: $log_file"
                 return 1
             }
             

@@ -1,5 +1,12 @@
+# Rule file: brute-force.rules
+# Version: 1.0
+# Category: Authentication
+# Tags: login,ssh,sudo,brute-force
+# Last updated: 2023-04-15
+# Author: Dao Tuan Anh Nguyen
+#
 # Brute Force Attack Detection Rules
-# Format: RULE_ID;DESCRIPTION;PATTERN;SEVERITY;FIELDS
+# Format: RULE_ID;DESCRIPTION;PATTERN;SEVERITY;FIELDS;TAGS
 #
 # Fields reference (0-based index):
 # 0 - timestamp
@@ -14,18 +21,18 @@
 # 9 - message
 
 # SSH Failed Password Attempts
-BF-SSH-001;SSH Multiple Failed Password Attempts;Failed\ password;MEDIUM;7,9
-BF-SSH-002;SSH Authentication Failure;authentication failure;MEDIUM;9
-BF-SSH-003;SSH Invalid User;Invalid user;HIGH;9
-BF-SSH-004;SSH Connection Closed by Invalid User;Connection closed by invalid user;HIGH;9
+BF-SSH-001;SSH Multiple Failed Password Attempts;Failed\ password;MEDIUM;7,9;ssh,authentication,failure
+BF-SSH-002;SSH Authentication Failure;authentication failure;MEDIUM;9;ssh,authentication,failure
+BF-SSH-003;SSH Invalid User;Invalid user;HIGH;9;ssh,authentication,failure
+BF-SSH-004;SSH Connection Closed by Invalid User;Connection closed by invalid user;HIGH;9;ssh,authentication,failure
 
 # Failed sudo attempts
-BF-SUDO-001;Multiple Failed sudo Password Attempts;authentication failure;HIGH;7,9
-BF-SUDO-002;Failed sudo Command Execution;3 incorrect password attempts;HIGH;9
+BF-SUDO-001;Multiple Failed sudo Password Attempts;authentication failure;HIGH;7,9;sudo,authentication,failure
+BF-SUDO-002;Failed sudo Command Execution;3 incorrect password attempts;HIGH;9;sudo,authentication,failure
 
 # General Authentication Failures
-BF-AUTH-001;Multiple Failed Login Attempts;failed login;MEDIUM;9
-BF-AUTH-002;PAM Authentication Failure;pam_unix\(.*\): authentication failure;MEDIUM;9
+BF-AUTH-001;Multiple Failed Login Attempts;failed login;MEDIUM;9;authentication,failure
+BF-AUTH-002;PAM Authentication Failure;pam_unix\(.*\): authentication failure;MEDIUM;9;authentication,failure
 
 # Rate-based detection
-BF-RATE-001;High Rate of Authentication Failures;authentication failure|Failed password;HIGH;9
+BF-RATE-001;High Rate of Authentication Failures;authentication failure|Failed password;HIGH;9;rate-limit,authentication,failure

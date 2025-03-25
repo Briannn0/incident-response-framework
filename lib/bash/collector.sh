@@ -152,32 +152,40 @@ irf_collect_log_data() {
                 irf_log ERROR "Failed to create lock directory"
                 return 1
             }
-        }
+        fi
         
-        # Try to acquire lock with timeout
+        # Try to acquire lock with improved error handling
         local timeout=10
         local start_time=$(date +%s)
-        
+        local lock_file="${IRF_LOG_DIR}/.collector_lock"
+
         while true; do
             if flock -n 200; then
                 break
             else
                 # Check if exceeded timeout
                 if [[ $(($(date +%s) - start_time)) -gt $timeout ]]; then
-                    # Check if lock is stale
-                    local lock_pid=$(fuser "${IRF_LOG_DIR}/.collector_lock" 2>/dev/null)
-                    if [[ -z "$lock_pid" ]]; then
-                        irf_log WARN "Detected stale lock, removing and retrying"
-                        rm -f "${IRF_LOG_DIR}/.collector_lock"
+                    # Check if lock is stale by checking if process still exists
+                    local lock_pid=$(cat "${lock_file}.pid" 2>/dev/null)
+                    if [[ -n "$lock_pid" ]] && ! ps -p "$lock_pid" > /dev/null; then
+                        irf_log WARN "Detected stale lock (PID $lock_pid), removing and retrying"
+                        rm -f "$lock_file" "${lock_file}.pid"
+                        continue
+                    elif [[ -z "$lock_pid" ]]; then
+                        irf_log WARN "Lock file has no owner PID, recovering"
+                        rm -f "$lock_file"
                         continue
                     else
-                        irf_log ERROR "Failed to acquire lock (held by PID $lock_pid)"
+                        irf_log ERROR "Failed to acquire lock after $timeout seconds (held by PID $lock_pid)"
                         return 1
                     fi
                 fi
                 sleep 0.5
             fi
         done
+
+        # Record our PID in the lock file
+        echo $$ > "${lock_file}.pid"
         
         # Process based on collection method
         case "$COLLECTION_METHOD" in
@@ -234,6 +242,8 @@ irf_collect_log_data() {
                 ;;
         esac
         
+        # Add before releasing the lock with flock -u 200
+        rm -f "${lock_file}.pid"
         flock -u 200
     ) 200>"${IRF_LOG_DIR}/.collector_lock"
     

@@ -1,0 +1,17 @@
+# Web Application Attack Detection Rules
+# Version: 1.0
+# Last updated: 2025-03-25
+# Format: RULE_ID;DESCRIPTION;PATTERN;SEVERITY;FIELDS
+
+# SQL Injection
+WA-SQL-001;SQL Injection Attempt;(UNION|SELECT).*FROM|INSERT.*INTO;HIGH;9
+WA-SQL-002;SQL Comment Pattern;/\*.*\*/|--;HIGH;9
+
+# XSS
+WA-XSS-001;Cross-Site Scripting Attempt;<script>|javascript:|alert\(|onclick=;HIGH;9
+
+# Path Traversal
+WA-PTH-001;Path Traversal Attempt;\.\.\/|\.\.%2f|etc\/passwd;HIGH;9
+
+# File Upload
+WA-UPL-001;Suspicious File Upload;\.php|\.jsp|\.asp;MEDIUM;9

@@ -115,17 +115,42 @@ irf_parse_log_line() {
                 ;;
             
             json)
-                # Use jq if available, otherwise basic parsing with grep
+                # Handle JSON format with jq if available
                 if command -v jq &>/dev/null; then
-                    # Parse with jq and extract known fields
-                    # This assumes the JSON structure matches our field names
-                    for field in "${IRF_FIELDS[@]}"; do
-                        local value
-                        value=$(echo "$log_line" | jq -r ".$field // empty" 2>/dev/null)
-                        if [[ -n "$value" && "$value" != "null" ]]; then
-                            parsed_fields["$field"]="$value"
+                    # Store JSON string in a temporary file for jq to process
+                    local temp_file=$(mktemp)
+                    echo "$log_line" > "$temp_file"
+                    
+                    # Extract fields based on source configuration
+                    if [[ -n "${JSON_TIMESTAMP_FIELD:-}" ]]; then
+                        parsed_fields["timestamp"]=$(jq -r ".${JSON_TIMESTAMP_FIELD} // empty" "$temp_file" 2>/dev/null)
+                    fi
+                    
+                    if [[ -n "${JSON_LEVEL_FIELD:-}" ]]; then
+                        parsed_fields["log_level"]=$(jq -r ".${JSON_LEVEL_FIELD} // empty" "$temp_file" 2>/dev/null)
+                    fi
+                    
+                    if [[ -n "${JSON_MESSAGE_FIELD:-}" ]]; then
+                        parsed_fields["message"]=$(jq -r ".${JSON_MESSAGE_FIELD} // empty" "$temp_file" 2>/dev/null)
+                    fi
+                    
+                    if [[ -n "${JSON_SERVICE_FIELD:-}" ]]; then
+                        parsed_fields["service"]=$(jq -r ".${JSON_SERVICE_FIELD} // empty" "$temp_file" 2>/dev/null)
+                    fi
+                    
+                    if [[ -n "${JSON_USER_FIELD:-}" ]]; then
+                        parsed_fields["username"]=$(jq -r ".${JSON_USER_FIELD} // empty" "$temp_file" 2>/dev/null)
+                    fi
+                    
+                    # Check for IP addresses in various fields
+                    if [[ -n "${IP_ADDRESS_REGEX:-}" ]]; then
+                        if [[ "$log_line" =~ $IP_ADDRESS_REGEX ]]; then
+                            parsed_fields["ip_address"]="${BASH_REMATCH[1]}"
                         fi
-                    done
+                    fi
+                    
+                    # Clean up
+                    rm -f "$temp_file"
                 else
                     # Fallback basic parsing for JSON logs
                     for field in "${IRF_FIELDS[@]}"; do
@@ -133,6 +158,51 @@ irf_parse_log_line() {
                             parsed_fields["$field"]="${BASH_REMATCH[1]}"
                         fi
                     done
+                fi
+                ;;
+            
+            structlog)
+                # Structured logging format (key=value pairs)
+                # Extract timestamp using the provided regex
+                if [[ -n "${TIMESTAMP_REGEX:-}" && "$log_line" =~ $TIMESTAMP_REGEX ]]; then
+                    parsed_fields["timestamp"]="${BASH_REMATCH[1]}"
+                fi
+                
+                # Extract all key=value pairs
+                local field_pattern="$FIELD_PATTERN_REGEX"
+                if [[ -z "$field_pattern" ]]; then
+                    field_pattern="([a-zA-Z0-9_]+)=(?:\"([^\"]*)\"|([^ ]*))"
+                fi
+                
+                local offset=0
+                local line_len=${#log_line}
+                while (( offset < line_len )); do
+                    if [[ "${log_line:$offset}" =~ $field_pattern ]]; then
+                        local key="${BASH_REMATCH[1]}"
+                        local value="${BASH_REMATCH[2]}${BASH_REMATCH[3]}"
+                        
+                        # Map to standard fields based on key
+                        case "$key" in
+                            user|username) parsed_fields["username"]="$value" ;;
+                            host|hostname) parsed_fields["hostname"]="$value" ;;
+                            service) parsed_fields["service"]="$value" ;;
+                            level|severity) parsed_fields["log_level"]="$value" ;;
+                            message|msg) parsed_fields["message"]="$value" ;;
+                            ip|client_ip|remote_ip) parsed_fields["ip_address"]="$value" ;;
+                            pid|process_id) parsed_fields["process_id"]="$value" ;;
+                        esac
+                        
+                        # Move past this match
+                        offset=$(( offset + ${#BASH_REMATCH[0]} ))
+                    else
+                        # No more matches
+                        break
+                    fi
+                done
+                
+                # If no message field was found, use the whole line
+                if [[ -z "${parsed_fields["message"]}" ]]; then
+                    parsed_fields["message"]="$log_line"
                 fi
                 ;;
             

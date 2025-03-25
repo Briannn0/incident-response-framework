@@ -3,10 +3,12 @@
 # Common utility functions for the Incident Response Framework
 # This library provides foundational functions used across all modules
 
-# Ensure we fail on errors and undefined variables
+# Find these lines near the beginning
 set -o errexit
 set -o nounset
+# Add this line
 set -o pipefail
+
 
 # Global variables
 IRF_VERSION="0.1.0"
@@ -91,6 +93,130 @@ irf_validate_directory() {
 }
 
 #
+# Function: irf_validate_safe_path
+# Description: Validate that a path is safe and doesn't contain directory traversal
+# Arguments:
+#   $1 - Path to validate
+# Returns:
+#   0 if path is safe, 1 otherwise
+#
+irf_validate_safe_path() {
+    local path="$1"
+    local normalized_path
+    
+    # Check for common path traversal patterns
+    if [[ "$path" == *".."* || "$path" == *"/./"* || "$path" == *"~"* ]]; then
+        irf_log ERROR "Path contains potentially unsafe patterns: $path"
+        return 1
+    fi
+    
+    # Check for absolute paths starting with / if not allowed
+    if [[ "$path" == /* && "${ALLOW_ABSOLUTE_PATHS:-false}" != "true" ]]; then
+        irf_log ERROR "Absolute paths not allowed in this context: $path"
+        return 1
+    fi
+    
+    # Check path length to prevent buffer overflow exploits
+    if [[ "${#path}" -gt 4096 ]]; then
+        irf_log ERROR "Path exceeds maximum allowed length: ${#path} characters"
+        return 1
+    fi
+    
+    # Verify path doesn't contain invalid characters
+    if [[ "$path" =~ [[:cntrl:]] ]]; then
+        irf_log ERROR "Path contains control characters: $path"
+        return 1
+    fi
+    
+    return 0
+}
+
+#
+# Function: irf_generate_checksum
+# Description: Generate a checksum for a file
+# Arguments:
+#   $1 - File path
+# Returns:
+#   Checksum string, or empty if error
+#
+irf_generate_checksum() {
+    local file_path="$1"
+    
+    if [[ ! -f "$file_path" ]]; then
+        irf_log ERROR "File not found for checksum: $file_path"
+        return 1
+    fi
+    
+    # Use sha256sum if available, otherwise fallback to md5sum
+    if command -v sha256sum &>/dev/null; then
+        sha256sum "$file_path" | awk '{print $1}'
+    elif command -v md5sum &>/dev/null; then
+        md5sum "$file_path" | awk '{print $1}'
+    else
+        irf_log ERROR "No checksum tool available"
+        return 1
+    fi
+}
+
+#
+# Function: irf_verify_file_integrity
+# Description: Verify file integrity against stored checksum
+# Arguments:
+#   $1 - File path
+#   $2 - Optional checksum to verify against (if not provided, checks against stored checksum)
+# Returns:
+#   0 if integrity verified, 1 otherwise
+#
+irf_verify_file_integrity() {
+    local file_path="$1"
+    local expected_checksum="$2"
+    local checksum_file="${IRF_EVIDENCE_DIR}/checksums/$(basename "$file_path").sha256"
+    
+    # Create checksums directory if it doesn't exist
+    if [[ ! -d "${IRF_EVIDENCE_DIR}/checksums" ]]; then
+        mkdir -p "${IRF_EVIDENCE_DIR}/checksums" || {
+            irf_log ERROR "Failed to create checksums directory"
+            return 1
+        }
+    fi
+    
+    # Generate current checksum
+    local current_checksum
+    current_checksum=$(irf_generate_checksum "$file_path") || return 1
+    
+    # If expected checksum provided, verify against it
+    if [[ -n "$expected_checksum" ]]; then
+        if [[ "$current_checksum" != "$expected_checksum" ]]; then
+            irf_log ERROR "Integrity check failed for $file_path"
+            irf_log ERROR "Expected: $expected_checksum"
+            irf_log ERROR "Actual:   $current_checksum"
+            return 1
+        fi
+        
+        # Store checksum for future checks
+        echo "$current_checksum $file_path" > "$checksum_file"
+        return 0
+    fi
+    
+    # Otherwise check against stored checksum
+    if [[ -f "$checksum_file" ]]; then
+        expected_checksum=$(awk '{print $1}' "$checksum_file")
+        if [[ "$current_checksum" != "$expected_checksum" ]]; then
+            irf_log ERROR "Integrity check failed for $file_path"
+            irf_log ERROR "Expected: $expected_checksum"
+            irf_log ERROR "Actual:   $current_checksum"
+            return 1
+        fi
+    else
+        # No stored checksum, store current one
+        echo "$current_checksum $file_path" > "$checksum_file"
+        irf_log INFO "Stored initial checksum for $file_path"
+    fi
+    
+    return 0
+}
+
+#
 # Function: irf_load_config
 # Description: Load a configuration file
 # Arguments:
@@ -148,7 +274,7 @@ irf_validate_environment() {
                 irf_log ERROR "Failed to create directory: $dir"
                 return 1
             }
-        }
+        fi
         
         if [[ ! -w "$dir" ]]; then
             irf_log ERROR "Directory not writable: $dir"
@@ -344,4 +470,119 @@ irf_init() {
     export IRF_INITIALIZED=1
     irf_log INFO "Incident Response Framework initialized (v$IRF_VERSION)"
     return 0
+}
+
+#
+# Function: irf_monitor_process
+# Description: Monitor a process and restart it if it fails
+# Arguments:
+#   $1 - Process name
+#   $2 - Command to start the process
+#   $3 - Max restarts (default: 5)
+#   $4 - Check interval in seconds (default: 60)
+# Returns:
+#   Process ID of the monitor
+#
+irf_monitor_process() {
+    local process_name="$1"
+    local start_command="$2"
+    local max_restarts="${3:-5}"
+    local check_interval="${4:-60}"
+    
+    # Start monitor in the background
+    (
+        local restart_count=0
+        local last_restart=0
+        
+        while true; do
+            # Check if process is running
+            if ! pgrep -f "$process_name" > /dev/null; then
+                # Process not running, check if we should restart
+                local current_time=$(date +%s)
+                
+                # If last restart was more than 5 minutes ago, reset counter
+                if (( current_time - last_restart > 300 )); then
+                    restart_count=0
+                fi
+                
+                # Check if we've hit the max restarts
+                if (( restart_count >= max_restarts )); then
+                    irf_log ERROR "Process $process_name has crashed $restart_count times. Not restarting."
+                    break
+                fi
+                
+                # Restart the process
+                irf_log WARN "Process $process_name not running. Restarting..."
+                $start_command
+                
+                # Update counter
+                restart_count=$((restart_count + 1))
+                last_restart=$current_time
+            fi
+            
+            # Wait before checking again
+            sleep $check_interval
+        done
+    ) &
+    
+    echo $! # Return PID of monitor process
+}
+
+#
+# Function: irf_create_checkpoint
+# Description: Save state checkpoint for recovery
+# Arguments:
+#   $1 - Checkpoint identifier
+#   $2 - Data to save (serialized)
+# Returns:
+#   0 if successful, 1 otherwise
+#
+irf_create_checkpoint() {
+    local checkpoint_id="$1"
+    local checkpoint_data="$2"
+    local checkpoint_dir="${IRF_ROOT}/checkpoints"
+    local checkpoint_file="${checkpoint_dir}/${checkpoint_id}.checkpoint"
+    
+    # Create checkpoint directory if it doesn't exist
+    mkdir -p "$checkpoint_dir" || {
+        irf_log ERROR "Failed to create checkpoint directory: $checkpoint_dir"
+        return 1
+    }
+    
+    # Save checkpoint data
+    echo "$checkpoint_data" > "$checkpoint_file" || {
+        irf_log ERROR "Failed to write checkpoint: $checkpoint_file"
+        return 1
+    }
+    
+    # Create timestamp file
+    date -u +"%Y-%m-%dT%H:%M:%SZ" > "${checkpoint_file}.timestamp" || {
+        irf_log WARN "Failed to create checkpoint timestamp file"
+    }
+    
+    irf_log INFO "Created checkpoint: $checkpoint_id"
+    return 0
+}
+
+#
+# Function: irf_restore_checkpoint
+# Description: Restore state from checkpoint
+# Arguments:
+#   $1 - Checkpoint identifier
+# Returns:
+#   Checkpoint data or empty if not found
+#
+irf_restore_checkpoint() {
+    local checkpoint_id="$1"
+    local checkpoint_dir="${IRF_ROOT}/checkpoints"
+    local checkpoint_file="${checkpoint_dir}/${checkpoint_id}.checkpoint"
+    
+    if [[ -f "$checkpoint_file" ]]; then
+        cat "$checkpoint_file"
+        irf_log INFO "Restored checkpoint: $checkpoint_id"
+        return 0
+    else
+        irf_log WARN "Checkpoint not found: $checkpoint_id"
+        return 1
+    fi
 }

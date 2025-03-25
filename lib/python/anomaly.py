@@ -271,6 +271,83 @@ class AnomalyDetector:
         return results
     
     @handle_errors
+    def detect_mad_anomalies(self, fields, threshold=3.5, output_file=None):
+        """Detect anomalies using Median Absolute Deviation (distribution-agnostic).
+        
+        Args:
+            fields: List of column names to analyze
+            threshold: MAD threshold for anomaly detection (typically 3.0-5.0)
+            output_file: Path to save the results (optional)
+        
+        Returns:
+            Dictionary with anomaly details
+        """
+        if self.data is None:
+            return None
+            
+        results = {}
+        anomalies = []
+        
+        # Process each field
+        for field in fields:
+            if field not in self.data.columns:
+                continue
+                
+            field_data = self.data[field]
+            
+            # Skip non-numeric fields
+            if not np.issubdtype(field_data.dtype, np.number):
+                continue
+                
+            # Calculate median
+            median = np.median(field_data)
+            
+            # Calculate absolute deviations
+            abs_dev = np.abs(field_data - median)
+            
+            # Calculate MAD (Median Absolute Deviation)
+            mad = np.median(abs_dev)
+            
+            # Avoid division by zero
+            if mad == 0:
+                continue
+                
+            # Calculate modified z-scores
+            # 0.6745 is a constant to make MAD consistent with standard deviation for normal distributions
+            m_z_scores = 0.6745 * abs_dev / mad
+            
+            # Find anomalies where modified z-score > threshold
+            anomaly_indices = np.where(m_z_scores > threshold)[0]
+            
+            if len(anomaly_indices) > 0:
+                for idx in anomaly_indices:
+                    if idx < len(self.data):
+                        row = self.data.iloc[idx].to_dict()
+                        anomalies.append({
+                            'method': 'median_absolute_deviation',
+                            'field': field,
+                            'value': float(field_data.iloc[idx]),
+                            'mad_score': float(m_z_scores[idx]),
+                            'median': float(median),
+                            'mad': float(mad),
+                            'timestamp': str(row.get(self.time_field, '')),
+                            'row_data': row
+                        })
+        
+        results['mad_anomalies'] = {
+            'count': len(anomalies),
+            'threshold': threshold,
+            'anomalies': anomalies
+        }
+        
+        # Save results if output file provided
+        if output_file:
+            with open(output_file, 'w') as f:
+                json.dump(results, f, indent=2, default=str)
+        
+        return results
+        
+    @handle_errors
     def run_all_detections(self, fields, output_file=None):
         """Run all anomaly detection methods.
         
@@ -291,6 +368,11 @@ class AnomalyDetector:
         if stat_results:
             results.update(stat_results)
         
+        # Run Median Absolute Deviation
+        mad_results = self.detect_mad_anomalies(fields)
+        if mad_results:
+            results.update(mad_results)
+        
         # Run Isolation Forest
         if_results = self.detect_isolation_forest_anomalies(fields)
         if if_results:
@@ -304,7 +386,8 @@ class AnomalyDetector:
         # Calculate overall stats
         total_anomalies = 0
         for method, method_results in results.items():
-            total_anomalies += method_results.get('count', 0)
+            if isinstance(method_results, dict) and 'count' in method_results:
+                total_anomalies += method_results.get('count', 0)
         
         results['summary'] = {
             'total_anomalies': total_anomalies,
@@ -327,7 +410,7 @@ if __name__ == "__main__":
     parser.add_argument('--format', default='tsv', choices=['csv', 'tsv', 'json'], help='Data file format')
     parser.add_argument('--output', required=True, help='Path to output file')
     parser.add_argument('--fields', required=True, help='Comma-separated list of fields to analyze')
-    parser.add_argument('--method', default='all', choices=['statistical', 'isolation_forest', 'dbscan', 'all'], 
+    parser.add_argument('--method', default='all', choices=['statistical', 'isolation_forest', 'dbscan', 'mad', 'all'], 
                         help='Anomaly detection method to use')
     
     args = parser.parse_args()
@@ -357,6 +440,10 @@ if __name__ == "__main__":
         if args.method == 'dbscan' or args.method == 'all':
             detector.detect_dbscan_anomalies(fields, output_file=args.output)
             print(f"DBSCAN anomaly detection complete. Results saved to {args.output}")
+            
+        if args.method == 'mad' or args.method == 'all':
+            detector.detect_mad_anomalies(fields, output_file=args.output)
+            print(f"Median Absolute Deviation anomaly detection complete. Results saved to {args.output}")
         
         if args.method == 'all':
             results = detector.run_all_detections(fields, args.output)
@@ -366,7 +453,7 @@ if __name__ == "__main__":
         error_info = {
             "status": "error",
             "error_type": type(e).__name__,
-            "error_message": str(e)
+                "error_message": str(e)
         }
         sys.stderr.write(json.dumps(error_info) + "\n")
         sys.exit(1)

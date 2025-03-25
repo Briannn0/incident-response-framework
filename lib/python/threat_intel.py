@@ -17,6 +17,36 @@ import random
 from datetime import datetime, timedelta
 import sqlite3
 import traceback
+import base64
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+def generate_key(password, salt=None):
+    """Generate encryption key from password and salt."""
+    if salt is None:
+        salt = os.urandom(16)
+    
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=100000
+    )
+    key = base64.urlsafe_b64encode(kdf.derive(password.encode()))
+    return key, salt
+
+def encrypt_api_key(api_key, encryption_key):
+    """Encrypt an API key using Fernet symmetric encryption."""
+    f = Fernet(encryption_key)
+    encrypted_key = f.encrypt(api_key.encode())
+    return encrypted_key
+
+def decrypt_api_key(encrypted_key, encryption_key):
+    """Decrypt an API key using Fernet symmetric encryption."""
+    f = Fernet(encryption_key)
+    decrypted_key = f.decrypt(encrypted_key).decode()
+    return decrypted_key
 
 def handle_errors(func):
     """Decorator for standardized error handling"""
@@ -90,6 +120,271 @@ def make_api_request(url, headers=None, params=None, timeout=30, max_retries=3):
     
     return None
 
+def make_robust_api_request(url, service, api_key_manager, headers=None, params=None, timeout=30, max_retries=3):
+    """Make API request with robust error handling and rate limit management."""
+    headers = headers or {}
+    params = params or {}
+    retry_count = 0
+    backoff_factor = 2.0
+    
+    # Check rate limits before making request
+    if not api_key_manager.check_rate_limit(service):
+        # Get rate reset time
+        conn = sqlite3.connect(api_key_manager.keys_db)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+        SELECT rate_reset FROM api_keys
+        WHERE service = ?
+        ''', (service,))
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result:
+            rate_reset = datetime.fromisoformat(result[0])
+            wait_seconds = max(1, (rate_reset - datetime.now()).total_seconds())
+            
+            # Sleep until rate limit reset
+            if wait_seconds < 300:  # Don't wait more than 5 minutes
+                print(f"Waiting {wait_seconds:.0f} seconds for rate limit reset")
+                time.sleep(wait_seconds)
+            else:
+                return {
+                    'error': 'rate_limited',
+                    'wait_seconds': wait_seconds
+                }
+    
+    while retry_count < max_retries:
+        try:
+            # Make request with timeout
+            response = requests.get(
+                url, 
+                headers=headers, 
+                params=params,
+                timeout=timeout
+            )
+            
+            # Update rate limit information
+            rate_limit = response.headers.get('X-RateLimit-Limit')
+            rate_remaining = response.headers.get('X-RateLimit-Remaining')
+            rate_reset = response.headers.get('X-RateLimit-Reset')
+            
+            if rate_limit and rate_remaining and rate_reset:
+                # Convert rate_reset to datetime
+                reset_time = datetime.fromtimestamp(int(rate_reset))
+                api_key_manager.update_rate_limits(
+                    service, 
+                    int(rate_limit), 
+                    int(rate_remaining), 
+                    reset_time.isoformat()
+                )
+                
+            # Handle rate limiting
+            if response.status_code == 429:
+                retry_after = int(response.headers.get('Retry-After', 60))
+                print(f"Rate limited, waiting {retry_after}s")
+                
+                # Update rate limit info in database
+                api_key_manager.update_rate_limits(
+                    service,
+                    0, 
+                    0, 
+                    (datetime.now() + timedelta(seconds=retry_after)).isoformat()
+                )
+                
+                # Sleep if retry_after is reasonable
+                if retry_after < 300:  # Don't wait more than 5 minutes
+                    time.sleep(retry_after)
+                    retry_count += 1
+                    continue
+                else:
+                    return {
+                        'error': 'rate_limited',
+                        'wait_seconds': retry_after
+                    }
+                    
+            # Handle server errors with exponential backoff
+            if response.status_code >= 500:
+                sleep_time = backoff_factor ** retry_count + random.random()
+                print(f"Server error {response.status_code}, retrying in {sleep_time:.1f}s")
+                time.sleep(sleep_time)
+                retry_count += 1
+                continue
+                
+            # Handle client errors
+            if response.status_code >= 400:
+                return {
+                    'error': 'client_error',
+                    'status_code': response.status_code,
+                    'message': response.text
+                }
+                
+            # Parse JSON with error handling
+            try:
+                return response.json()
+            except ValueError:
+                return {
+                    'error': 'invalid_json',
+                    'raw_content': response.text[:1000]  # Truncate long responses
+                }
+                
+        except requests.Timeout:
+            print(f"Request timed out after {timeout}s")
+            retry_count += 1
+            sleep_time = backoff_factor ** retry_count
+            time.sleep(sleep_time)
+            
+        except requests.RequestException as e:
+            print(f"Request failed: {e}")
+            retry_count += 1
+            sleep_time = backoff_factor ** retry_count
+            time.sleep(sleep_time)
+    
+    return {
+        'error': 'max_retries_exceeded',
+        'retries': max_retries
+    }
+
+class ApiKeyManager:
+    """Securely manage API keys for threat intelligence services."""
+    
+    def __init__(self, config=None):
+        """Initialize the API key manager with optional configuration."""
+        self.config = config or {}
+        self.keys_db = os.path.join(
+            os.environ.get('IRF_ROOT', '.'), 
+            'threat_intel', 
+            'keys.db'
+        )
+        self.master_password = self.config.get('master_password', os.environ.get('IRF_MASTER_PASSWORD'))
+        
+        # Initialize the database
+        self._initialize_db()
+        
+    def _initialize_db(self):
+        """Initialize the API keys database."""
+        conn = sqlite3.connect(self.keys_db)
+        cursor = conn.cursor()
+        
+        # Create tables if they don't exist
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS api_keys (
+            service TEXT PRIMARY KEY,
+            encrypted_key BLOB,
+            salt BLOB,
+            last_used TIMESTAMP,
+            rate_limit INT,
+            rate_remaining INT,
+            rate_reset TIMESTAMP
+        )
+        ''')
+        
+        conn.commit()
+        conn.close()
+        
+    def set_api_key(self, service, api_key):
+        """Securely store an API key for a service."""
+        if not self.master_password:
+            raise ValueError("Master password not configured")
+            
+        # Generate encryption key
+        encryption_key, salt = generate_key(self.master_password)
+        
+        # Encrypt the API key
+        encrypted_key = encrypt_api_key(api_key, encryption_key)
+        
+        # Store in database
+        conn = sqlite3.connect(self.keys_db)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+        INSERT OR REPLACE INTO api_keys
+        (service, encrypted_key, salt, last_used, rate_limit, rate_remaining)
+        VALUES (?, ?, ?, datetime('now'), 0, 0)
+        ''', (service, encrypted_key, salt))
+        
+        conn.commit()
+        conn.close()
+        
+    def get_api_key(self, service):
+        """Securely retrieve an API key for a service."""
+        if not self.master_password:
+            raise ValueError("Master password not configured")
+            
+        # Get encrypted key from database
+        conn = sqlite3.connect(self.keys_db)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+        SELECT encrypted_key, salt FROM api_keys
+        WHERE service = ?
+        ''', (service,))
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        if not result:
+            return None
+            
+        encrypted_key, salt = result
+        
+        # Regenerate encryption key
+        encryption_key, _ = generate_key(self.master_password, salt)
+        
+        # Decrypt the API key
+        try:
+            api_key = decrypt_api_key(encrypted_key, encryption_key)
+            return api_key
+        except Exception as e:
+            print(f"Error decrypting API key: {e}")
+            return None
+            
+    def update_rate_limits(self, service, rate_limit, rate_remaining, rate_reset):
+        """Update rate limit information for a service."""
+        conn = sqlite3.connect(self.keys_db)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+        UPDATE api_keys
+        SET rate_limit = ?, rate_remaining = ?, rate_reset = ?, last_used = datetime('now')
+        WHERE service = ?
+        ''', (rate_limit, rate_remaining, rate_reset, service))
+        
+        conn.commit()
+        conn.close()
+        
+    def check_rate_limit(self, service):
+        """Check if rate limit is reached for a service."""
+        conn = sqlite3.connect(self.keys_db)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+        SELECT rate_remaining, rate_reset FROM api_keys
+        WHERE service = ?
+        ''', (service,))
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        if not result:
+            return True  # No rate limit info, assume OK
+            
+        rate_remaining, rate_reset = result
+        
+        if rate_remaining <= 0:
+            # Check if reset time has passed
+            reset_time = datetime.fromisoformat(rate_reset)
+            now = datetime.now()
+            
+            if now < reset_time:
+                # Still rate limited
+                wait_seconds = (reset_time - now).total_seconds()
+                print(f"Rate limit reached for {service}. Reset in {wait_seconds:.0f} seconds")
+                return False
+                
+        return True  # Not rate limited
+
 class ThreatIntelligence:
     def __init__(self, config=None):
         """Initialize the threat intelligence module with optional configuration"""
@@ -105,12 +400,12 @@ class ThreatIntelligence:
         self.cache_db = os.path.join(self.cache_dir, 'intel_cache.db')
         self._initialize_cache_db()
         
-        # API keys (should be in config)
-        self.api_keys = self.config.get('api_keys', {})
+        # Initialize API key manager
+        self.api_key_manager = ApiKeyManager(self.config)
         
         # Default sources if not specified
         self.default_sources = ['local_cache', 'otx', 'abuse_ipdb']
-        
+    
     def _initialize_cache_db(self):
         """Set up the cache database"""
         conn = sqlite3.connect(self.cache_db)
@@ -235,7 +530,7 @@ class ThreatIntelligence:
         # Check AbuseIPDB
         if 'abuse_ipdb' in sources:
             try:
-                api_key = self.api_keys.get('abuse_ipdb')
+                api_key = self.api_key_manager.get_api_key('abuse_ipdb')
                 if not api_key:
                     print("Warning: No API key for AbuseIPDB")
                 else:
@@ -251,9 +546,16 @@ class ThreatIntelligence:
                         'maxAgeInDays': 90
                     }
                     
-                    response = requests.get(url, headers=headers, params=params)
-                    if response.status_code == 200:
-                        data = response.json()
+                    response = make_robust_api_request(
+                        url, 
+                        'abuse_ipdb', 
+                        self.api_key_manager,
+                        headers=headers, 
+                        params=params
+                    )
+                    
+                    if 'error' not in response:
+                        data = response
                         score = data['data'].get('abuseConfidenceScore', 0)
                         is_malicious = score >= 80  # 80% confidence threshold
                         
@@ -276,7 +578,7 @@ class ThreatIntelligence:
         # Check AlienVault OTX
         if 'otx' in sources:
             try:
-                api_key = self.api_keys.get('otx')
+                api_key = self.api_key_manager.get_api_key('otx')
                 if not api_key:
                     print("Warning: No API key for AlienVault OTX")
                 else:
@@ -285,10 +587,15 @@ class ThreatIntelligence:
                     url = f"https://otx.alienvault.com/api/v1/indicators/IPv4/{ip}/general"
                     headers = {'X-OTX-API-KEY': api_key}
                     
-                    response = requests.get(url, headers=headers)
-                    if response.status_code == 200:
-                        data = response.json()
-                        pulse_count = data.get('pulse_info', {}).get('count', 0)
+                    response = make_robust_api_request(
+                        url, 
+                        'otx', 
+                        self.api_key_manager,
+                        headers=headers
+                    )
+                    
+                    if 'error' not in response:
+                        pulse_count = response.get('pulse_info', {}).get('count', 0)
                         is_malicious = pulse_count > 0
                         
                         if is_malicious:
@@ -353,7 +660,7 @@ class ThreatIntelligence:
         # Check AlienVault OTX
         if 'otx' in sources:
             try:
-                api_key = self.api_keys.get('otx')
+                api_key = self.api_key_manager.get_api_key('otx')
                 if not api_key:
                     print("Warning: No API key for AlienVault OTX")
                 else:
@@ -362,26 +669,32 @@ class ThreatIntelligence:
                     url = f"https://otx.alienvault.com/api/v1/indicators/domain/{domain}/general"
                     headers = {'X-OTX-API-KEY': api_key}
                     
-                    response = requests.get(url, headers=headers)
-                    if response.status_code == 200:
-                        data = response.json()
-                        pulse_count = data.get('pulse_info', {}).get('count', 0)
-                        is_malicious = pulse_count > 0
-                        
-                        if is_malicious:
-                            threat_type = "OTX Detection"
-                            score = min(pulse_count * 10, 100)  # Convert pulse count to score
-                            self._save_to_cache('domain', domain, is_malicious, threat_type, score, 'otx')
+                    response = make_robust_api_request(
+                        url, 
+                        'otx', 
+                        self.api_key_manager,
+                        headers=headers
+                    )
+                    
+                    if response and 'error' not in response:
+                        if 'pulse_info' in response and 'count' in response['pulse_info']:
+                            pulse_count = response['pulse_info']['count']
+                            is_malicious = pulse_count > 0
                             
-                            return {
-                                'indicator': domain,
-                                'is_malicious': is_malicious,
-                                'threat_type': threat_type,
-                                'score': score,
-                                'source': 'otx',
-                                'last_updated': datetime.now().isoformat(),
-                                'sources_checked': sources_checked
-                            }
+                            if is_malicious:
+                                threat_type = "OTX Detection"
+                                score = min(pulse_count * 10, 100)  # Convert pulse count to score
+                                self._save_to_cache('domain', domain, is_malicious, threat_type, score, 'otx')
+                                
+                                return {
+                                    'indicator': domain,
+                                    'is_malicious': is_malicious,
+                                    'threat_type': threat_type,
+                                    'score': score,
+                                    'source': 'otx',
+                                    'last_updated': datetime.now().isoformat(),
+                                    'sources_checked': sources_checked
+                                }
             except Exception as e:
                 print(f"Error checking OTX: {e}")
         
@@ -441,7 +754,7 @@ class ThreatIntelligence:
         # Check AlienVault OTX
         if 'otx' in sources:
             try:
-                api_key = self.api_keys.get('otx')
+                api_key = self.api_key_manager.get_api_key('otx')
                 if not api_key:
                     print("Warning: No API key for AlienVault OTX")
                 else:
@@ -450,26 +763,32 @@ class ThreatIntelligence:
                     url = f"https://otx.alienvault.com/api/v1/indicators/file/{hash_value}/general"
                     headers = {'X-OTX-API-KEY': api_key}
                     
-                    response = requests.get(url, headers=headers)
-                    if response.status_code == 200:
-                        data = response.json()
-                        pulse_count = data.get('pulse_info', {}).get('count', 0)
-                        is_malicious = pulse_count > 0
-                        
-                        if is_malicious:
-                            threat_type = "OTX Detection"
-                            score = min(pulse_count * 10, 100)  # Convert pulse count to score
-                            self._save_to_cache('hash', hash_value, is_malicious, threat_type, score, 'otx')
+                    response = make_robust_api_request(
+                        url, 
+                        'otx', 
+                        self.api_key_manager,
+                        headers=headers
+                    )
+                    
+                    if response and 'error' not in response:
+                        if 'pulse_info' in response and 'count' in response['pulse_info']:
+                            pulse_count = response['pulse_info']['count']
+                            is_malicious = pulse_count > 0
                             
-                            return {
-                                'indicator': hash_value,
-                                'is_malicious': is_malicious,
-                                'threat_type': threat_type,
-                                'score': score,
-                                'source': 'otx',
-                                'last_updated': datetime.now().isoformat(),
-                                'sources_checked': sources_checked
-                            }
+                            if is_malicious:
+                                threat_type = "OTX Detection"
+                                score = min(pulse_count * 10, 100)  # Convert pulse count to score
+                                self._save_to_cache('hash', hash_value, is_malicious, threat_type, score, 'otx')
+                                
+                                return {
+                                    'indicator': hash_value,
+                                    'is_malicious': is_malicious,
+                                    'threat_type': threat_type,
+                                    'score': score,
+                                    'source': 'otx',
+                                    'last_updated': datetime.now().isoformat(),
+                                    'sources_checked': sources_checked
+                                }
             except Exception as e:
                 print(f"Error checking OTX: {e}")
         
