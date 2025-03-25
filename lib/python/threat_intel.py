@@ -18,6 +18,10 @@ from datetime import datetime, timedelta
 import sqlite3
 import traceback
 import base64
+import subprocess
+import signal
+import atexit
+import logging
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -405,6 +409,13 @@ class ThreatIntelligence:
         
         # Default sources if not specified
         self.default_sources = ['local_cache', 'otx', 'abuse_ipdb']
+        
+        # Track updater process
+        self.updater_pid = None
+        self.updater_log = os.path.join(self.cache_dir, 'updater.log')
+        
+        # Register cleanup handler
+        atexit.register(self.cleanup_updater)
     
     def _initialize_cache_db(self):
         """Set up the cache database"""
@@ -944,6 +955,33 @@ class ThreatIntelligence:
             'last_updated': datetime.now().isoformat()
         }
     
+    def _is_ip(self, indicator):
+        """Check if the indicator is an IP address."""
+        try:
+            ipaddress.ip_address(indicator)
+            return True
+        except ValueError:
+            return False
+    
+    def _is_domain(self, indicator):
+        """Check if the indicator is a valid domain."""
+        domain_pattern = r'^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$'
+        return bool(re.match(domain_pattern, indicator))
+    
+    def _is_url(self, indicator):
+        """Check if the indicator is a URL."""
+        url_pattern = r'^(https?|ftp)://[^\s/$.?#].[^\s]*$'
+        return bool(re.match(url_pattern, indicator))
+    
+    def _extract_domain_from_url(self, url):
+        """Extract domain from URL."""
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+            return parsed.netloc
+        except:
+            return None
+    
     def fetch_open_source_intel(self, source, output_dir=None):
         """Fetch threat intelligence from open source feeds"""
         if not output_dir:
@@ -952,8 +990,9 @@ class ThreatIntelligence:
         if not os.path.exists(output_dir):
             os.makedirs(output_dir, exist_ok=True)
             
-        # Define available feeds
+        # Define available feeds (updated with modern sources)
         feeds = {
+            # Original feeds
             'abuse_ch_feodo': {
                 'url': 'https://feodotracker.abuse.ch/downloads/ipblocklist.txt',
                 'type': 'ip',
@@ -978,6 +1017,39 @@ class ThreatIntelligence:
                 'url': 'https://mirror.cedia.org.ec/malwaredomains/justdomains',
                 'type': 'domain',
                 'comment_char': '#'
+            },
+            # New modern feeds
+            'misp_warning_list': {
+                'url': 'https://github.com/MISP/misp-warninglists/raw/main/lists/integrated-services/list.json',
+                'type': 'domain',
+                'format': 'json',
+                'field': 'list'
+            },
+            'phishtank': {
+                'url': 'https://data.phishtank.com/data/online-valid.json',
+                'type': 'url',
+                'format': 'json',
+                'field': 'url',
+                'requires_api_key': True
+            },
+            'alienvault_otx': {
+                'url': 'https://otx.alienvault.com/api/v1/pulses/subscribed',
+                'type': 'mixed',
+                'format': 'json',
+                'requires_api_key': True
+            },
+            'threatfox': {
+                'url': 'https://threatfox-api.abuse.ch/api/v1/',
+                'type': 'mixed',
+                'format': 'json',
+                'method': 'POST',
+                'body': '{"query": "get_iocs", "days": 30}'
+            },
+            'urlhaus': {
+                'url': 'https://urlhaus.abuse.ch/downloads/csv_recent/',
+                'type': 'url',
+                'format': 'csv',
+                'comment_char': '#'
             }
         }
         
@@ -987,32 +1059,76 @@ class ThreatIntelligence:
         feed = feeds[source]
         
         try:
-            # Download feed
-            response = requests.get(feed['url'], timeout=30)
-            response.raise_for_status()
-            
-            content = response.text
-            indicators = []
-            
-            # Parse content
-            for line in content.splitlines():
-                line = line.strip()
-                
-                # Skip comments and empty lines
-                if not line or line.startswith(feed['comment_char']):
-                    continue
+            # Handle different feed formats
+            if feed.get('format') == 'json':
+                # API key handling
+                headers = {}
+                if feed.get('requires_api_key', False):
+                    api_key = self.api_key_manager.get_api_key(source)
+                    if not api_key:
+                        return {
+                            'source': source,
+                            'error': 'API key required but not configured',
+                            'last_updated': datetime.now().isoformat()
+                        }
                     
-                # Extract indicator based on feed type
-                if feed['type'] == 'ip':
-                    # Simple IP or CIDR format
-                    match = re.search(r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(/\d{1,2})?', line)
-                    if match:
-                        indicators.append(match.group(0))
-                elif feed['type'] == 'domain':
-                    # Domain format
-                    match = re.search(r'([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}', line)
-                    if match:
-                        indicators.append(match.group(0))
+                    # Set appropriate header based on source
+                    if source == 'alienvault_otx':
+                        headers = {'X-OTX-API-KEY': api_key}
+                    elif source == 'phishtank':
+                        headers = {'Authorization': f'Bearer {api_key}'}
+                
+                # Make request with appropriate method
+                if feed.get('method', 'GET') == 'POST':
+                    response = requests.post(feed['url'], headers=headers, data=feed.get('body', {}), timeout=30)
+                else:
+                    response = requests.get(feed['url'], headers=headers, timeout=30)
+                
+                response.raise_for_status()
+                data = response.json()
+                
+                # Extract indicators based on source-specific logic
+                indicators = []
+                if source == 'misp_warning_list':
+                    indicators = data.get(feed['field'], [])
+                elif source == 'phishtank':
+                    indicators = [entry.get('url') for entry in data if 'url' in entry]
+                elif source == 'alienvault_otx':
+                    # Process OTX pulses
+                    for pulse in data.get('results', []):
+                        for ioc_type, iocs in pulse.get('indicators', {}).items():
+                            if isinstance(iocs, list):
+                                indicators.extend(iocs)
+                elif source == 'threatfox':
+                    # Process ThreatFox IOCs
+                    for ioc in data.get('data', {}).get('iocs', []):
+                        if 'ioc' in ioc:
+                            indicators.append(ioc['ioc'])
+            else:
+                # Handle traditional text-based feeds
+                response = requests.get(feed['url'], timeout=30)
+                response.raise_for_status()
+                
+                content = response.text
+                indicators = []
+                
+                # Parse content based on feed type
+                for line in content.splitlines():
+                    line = line.strip()
+                    
+                    # Skip comments and empty lines
+                    if not line or line.startswith(feed.get('comment_char', '#')):
+                        continue
+                    
+                    # Handle CSV format
+                    if feed.get('format') == 'csv':
+                        parts = line.split(',')
+                        if len(parts) > 1:
+                            # Extract the URL or relevant field based on feed structure
+                            indicators.append(parts[2] if len(parts) > 2 and source == 'urlhaus' else parts[0])
+                    else:
+                        # Simple line format
+                        indicators.append(line)
             
             # Save indicators
             output_file = os.path.join(output_dir, f"{source}_feed.txt")
@@ -1027,10 +1143,15 @@ class ThreatIntelligence:
             
             # Add to cache
             for indicator in indicators:
-                if feed['type'] == 'ip':
+                if feed['type'] == 'ip' or (feed['type'] == 'mixed' and self._is_ip(indicator)):
                     self._save_to_cache('ip', indicator, True, f"{source} feed", 80, source)
-                elif feed['type'] == 'domain':
+                elif feed['type'] == 'domain' or (feed['type'] == 'mixed' and self._is_domain(indicator)):
                     self._save_to_cache('domain', indicator, True, f"{source} feed", 80, source)
+                elif feed['type'] == 'url' or (feed['type'] == 'mixed' and self._is_url(indicator)):
+                    # Extract domain from URL
+                    domain = self._extract_domain_from_url(indicator)
+                    if domain:
+                        self._save_to_cache('domain', domain, True, f"{source} feed", 80, source)
             
             return {
                 'source': source,
@@ -1047,6 +1168,243 @@ class ThreatIntelligence:
                 'error': str(e),
                 'last_updated': datetime.now().isoformat()
             }
+    
+    def setup_automatic_updates(self, interval_hours=24, feeds=None, log_file=None):
+        """Set up automatic updates for threat intelligence feeds.
+        
+        Args:
+            interval_hours: Update interval in hours
+            feeds: List of feeds to update (default: abuse_ch_feodo, urlhaus, threatfox)
+            log_file: Path to log file (default: cache_dir/updater.log)
+            
+        Returns:
+            Process ID of the background updater
+        """
+        # Stop any existing updater
+        self.cleanup_updater()
+        
+        # Default feeds to update
+        if feeds is None:
+            feeds = ['abuse_ch_feodo', 'urlhaus', 'threatfox']
+        
+        # Set up logging
+        log_file = log_file or self.updater_log
+        
+        # Create a script for the updater
+        updater_script = os.path.join(self.cache_dir, 'auto_updater.sh')
+        pid_file = os.path.join(self.cache_dir, 'updater.pid')
+        
+        with open(updater_script, 'w') as f:
+            f.write(f"""#!/bin/bash
+# Automatic updater for threat intelligence feeds
+
+IRF_ROOT="{os.environ.get('IRF_ROOT', '.')}"
+PYTHON_BIN="{sys.executable}"
+INTERVAL={interval_hours * 3600}  # Convert to seconds
+LOG_FILE="{log_file}"
+PID_FILE="{pid_file}"
+
+# Write PID to file for management
+echo $$ > $PID_FILE
+
+# Function to handle termination
+cleanup() {{
+    echo "[$(date)] Updater process stopping" >> $LOG_FILE
+    rm -f $PID_FILE
+    exit 0
+}}
+
+# Set up signal handlers
+trap cleanup SIGTERM SIGINT
+
+while true; do
+    echo "[$(date)] Starting threat intelligence update" >> $LOG_FILE
+    
+    # Update each feed
+""")
+            
+            # Add each feed to the updater script
+            for feed in feeds:
+                f.write(f"""    echo "[$(date)] Updating {feed}" >> $LOG_FILE
+    $PYTHON_BIN $IRF_ROOT/lib/python/threat_intel.py --action fetch-feed --source {feed} >> $LOG_FILE 2>&1
+    if [ $? -ne 0 ]; then
+        echo "[$(date)] Error updating {feed}" >> $LOG_FILE
+    fi
+    
+""")
+            
+            f.write(f"""    # Update detection rules based on the latest intelligence
+    echo "[$(date)] Updating detection rules" >> $LOG_FILE
+    $PYTHON_BIN $IRF_ROOT/lib/python/threat_intel.py --action update-rules >> $LOG_FILE 2>&1
+    if [ $? -ne 0 ]; then
+        echo "[$(date)] Error updating rules" >> $LOG_FILE
+    fi
+
+    echo "[$(date)] Threat intelligence update completed" >> $LOG_FILE
+
+    # Wait for next update
+    sleep $INTERVAL
+done
+""")
+        
+        # Make the script executable
+        os.chmod(updater_script, 0o755)
+        
+        # Start the updater in the background
+        with open(log_file, 'a') as log:
+            log.write(f"[{datetime.now().isoformat()}] Starting automatic updater (interval: {interval_hours}h)\n")
+            log.write(f"[{datetime.now().isoformat()}] Feeds to update: {', '.join(feeds)}\n")
+            
+            process = subprocess.Popen(
+                ['/bin/bash', updater_script],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                start_new_session=True  # Detach process
+            )
+            
+            # Store the PID for management
+            self.updater_pid = process.pid
+            log.write(f"[{datetime.now().isoformat()}] Updater started with PID {self.updater_pid}\n")
+        
+        return self.updater_pid
+    
+    def cleanup_updater(self):
+        """Stop the automatic updater if running"""
+        pid_file = os.path.join(self.cache_dir, 'updater.pid')
+        
+        # Try to get PID from file if not stored in object
+        if not self.updater_pid and os.path.exists(pid_file):
+            try:
+                with open(pid_file, 'r') as f:
+                    self.updater_pid = int(f.read().strip())
+            except:
+                pass
+        
+        # Try to terminate the process
+        if self.updater_pid:
+            try:
+                os.kill(self.updater_pid, signal.SIGTERM)
+                with open(self.updater_log, 'a') as log:
+                    log.write(f"[{datetime.now().isoformat()}] Sent termination signal to updater (PID {self.updater_pid})\n")
+                self.updater_pid = None
+                return True
+            except OSError:
+                # Process already terminated
+                if os.path.exists(pid_file):
+                    os.unlink(pid_file)
+                self.updater_pid = None
+        
+        return False
+    
+    def check_updater_status(self):
+        """Check if the automatic updater is running
+        
+        Returns:
+            dict: Status information about the updater
+        """
+        pid_file = os.path.join(self.cache_dir, 'updater.pid')
+        
+        if not os.path.exists(pid_file):
+            return {
+                'running': False,
+                'status': 'Not running',
+                'last_update': None
+            }
+        
+        # Get PID from file
+        try:
+            with open(pid_file, 'r') as f:
+                pid = int(f.read().strip())
+        except:
+            return {
+                'running': False,
+                'status': 'PID file exists but is invalid',
+                'last_update': None
+            }
+        
+        # Check if process is running
+        try:
+            os.kill(pid, 0)  # Signal 0 is used to check if process exists
+            is_running = True
+        except OSError:
+            is_running = False
+        
+        # Get last update time from log
+        last_update = None
+        if os.path.exists(self.updater_log):
+            try:
+                with open(self.updater_log, 'r') as f:
+                    for line in reversed(list(f)):
+                        if "Threat intelligence update completed" in line:
+                            timestamp_match = re.search(r'\[(.*?)\]', line)
+                            if timestamp_match:
+                                last_update = timestamp_match.group(1)
+                                break
+            except:
+                pass
+        
+        return {
+            'running': is_running,
+            'pid': pid,
+            'status': 'Running' if is_running else 'Process not running (stale PID file)',
+            'last_update': last_update
+        }
+    
+    def run_manual_update(self, feeds=None):
+        """Run a manual update of threat intelligence feeds
+        
+        Args:
+            feeds: List of feeds to update (default: all configured feeds)
+            
+        Returns:
+            dict: Results of the update operation
+        """
+        feeds = feeds or ['abuse_ch_feodo', 'urlhaus', 'threatfox', 'emerging_threats']
+        
+        results = {
+            'start_time': datetime.now().isoformat(),
+            'feeds_updated': [],
+            'feeds_failed': [],
+            'rules_updated': False
+        }
+        
+        # Update each feed
+        for feed in feeds:
+            try:
+                result = self.fetch_open_source_intel(feed)
+                if 'error' in result:
+                    results['feeds_failed'].append({
+                        'feed': feed,
+                        'error': result['error']
+                    })
+                else:
+                    results['feeds_updated'].append({
+                        'feed': feed,
+                        'count': result['count']
+                    })
+            except Exception as e:
+                results['feeds_failed'].append({
+                    'feed': feed,
+                    'error': str(e)
+                })
+        
+        # Update rules
+        try:
+            rules_result = self.update_rules_from_intel()
+            results['rules_updated'] = True
+            results['rules_info'] = {
+                'ip_rules': rules_result['ip_rules_count'],
+                'domain_rules': rules_result['domain_rules_count'],
+                'rules_file': rules_result['rules_file']
+            }
+        except Exception as e:
+            results['rules_error'] = str(e)
+        
+        results['end_time'] = datetime.now().isoformat()
+        results['duration_seconds'] = (datetime.fromisoformat(results['end_time']) - 
+                                     datetime.fromisoformat(results['start_time'])).total_seconds()
+        
+        return results
 
 # Command-line interface
 if __name__ == "__main__":
@@ -1055,13 +1413,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='IRF Threat Intelligence Integration')
     parser.add_argument('--action', required=True, 
                       choices=['check-ip', 'check-domain', 'check-hash', 'enrich-alerts', 
-                               'update-rules', 'fetch-feed'],
+                               'update-rules', 'fetch-feed', 'setup-auto-updates',
+                               'stop-auto-updates', 'check-updater', 'run-update'],
                       help='Action to perform')
     parser.add_argument('--indicator', help='Indicator to check (IP, domain, or hash)')
     parser.add_argument('--alerts', help='Path to alerts file to enrich')
     parser.add_argument('--output', help='Path to output file')
     parser.add_argument('--source', help='Threat intel source')
     parser.add_argument('--config', help='Path to configuration file with API keys')
+    parser.add_argument('--interval', type=int, default=24, help='Update interval in hours')
+    parser.add_argument('--feeds', help='Comma-separated list of feeds to update')
     
     args = parser.parse_args()
     
@@ -1154,6 +1515,54 @@ if __name__ == "__main__":
             print(f"Downloaded {result['count']} indicators from {result['source']}")
             print(f"Feed saved to: {result['output_file']}")
     
+    @handle_errors
+    def setup_auto_updates_action():
+        """Set up automatic updates for threat intelligence feeds"""
+        interval = args.interval
+        feeds = args.feeds.split(',') if args.feeds else None
+        
+        pid = intel.setup_automatic_updates(interval_hours=interval, feeds=feeds)
+        print(f"Automatic updater started with PID {pid}")
+        print(f"Update interval: {interval} hours")
+        print(f"Log file: {intel.updater_log}")
+    
+    @handle_errors
+    def stop_auto_updates_action():
+        """Stop the automatic updater"""
+        if intel.cleanup_updater():
+            print("Automatic updater stopped successfully")
+        else:
+            print("No automatic updater running")
+    
+    @handle_errors
+    def check_updater_action():
+        """Check the status of the automatic updater"""
+        status = intel.check_updater_status()
+        print(json.dumps(status, indent=2))
+    
+    @handle_errors
+    def run_update_action():
+        """Run a manual update of threat intelligence feeds"""
+        feeds = args.feeds.split(',') if args.feeds else None
+        
+        print("Starting manual update of threat intelligence feeds...")
+        results = intel.run_manual_update(feeds)
+        
+        print(f"Update completed in {results['duration_seconds']:.1f} seconds")
+        print(f"Feeds updated: {len(results['feeds_updated'])}")
+        print(f"Feeds failed: {len(results['feeds_failed'])}")
+        
+        if results['rules_updated']:
+            print(f"Detection rules updated: {results['rules_info']['ip_rules']} IP rules, " 
+                  f"{results['rules_info']['domain_rules']} domain rules")
+        else:
+            print(f"Error updating rules: {results.get('rules_error', 'Unknown error')}")
+        
+        if args.output:
+            with open(args.output, 'w') as f:
+                json.dump(results, f, indent=2)
+            print(f"Detailed results saved to {args.output}")
+    
     # Map actions to handler functions
     action_handlers = {
         'check-ip': check_ip_action,
@@ -1161,7 +1570,11 @@ if __name__ == "__main__":
         'check-hash': check_hash_action,
         'enrich-alerts': enrich_alerts_action,
         'update-rules': update_rules_action,
-        'fetch-feed': fetch_feed_action
+        'fetch-feed': fetch_feed_action,
+        'setup-auto-updates': setup_auto_updates_action,
+        'stop-auto-updates': stop_auto_updates_action,
+        'check-updater': check_updater_action,
+        'run-update': run_update_action
     }
     
     # Execute the appropriate action

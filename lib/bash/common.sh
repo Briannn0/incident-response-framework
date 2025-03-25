@@ -419,6 +419,200 @@ irf_execute_python_script() {
     return 0
 }
 
+#
+# Function: irf_monitor_resources
+# Description: Monitor system resources and adjust framework behavior
+# Arguments:
+#   $1 - CPU threshold percentage (optional, default 80)
+#   $2 - Memory threshold percentage (optional, default 70)
+# Returns:
+#   0 if resources are below thresholds, 1 if any threshold is exceeded
+#
+irf_monitor_resources() {
+    local cpu_threshold="${1:-80}"
+    local mem_threshold="${2:-70}"
+    local resource_state=0
+
+    # Get current CPU usage (average over all cores)
+    local cpu_usage
+    if command -v mpstat &>/dev/null; then
+        # Using mpstat if available
+        cpu_usage=$(mpstat 1 1 | awk '/Average:/ {print 100 - $NF}')
+    else
+        # Fallback method
+        cpu_usage=$(top -bn1 | grep "Cpu(s)" | awk '{print $2 + $4}')
+    fi
+
+    # Get current memory usage
+    local mem_usage
+    mem_usage=$(free | grep Mem | awk '{print int($3/$2 * 100)}')
+
+    # Log current resource usage periodically
+    if [[ -n "${IRF_LAST_RESOURCE_LOG:-}" ]]; then
+        local now=$(date +%s)
+        if (( now - IRF_LAST_RESOURCE_LOG > 300 )); then  # Log every 5 minutes
+            irf_log DEBUG "Resource usage: CPU=${cpu_usage}%, Memory=${mem_usage}%"
+            export IRF_LAST_RESOURCE_LOG=$now
+        fi
+    else
+        export IRF_LAST_RESOURCE_LOG=$(date +%s)
+    fi
+
+    # Check against thresholds and apply throttling
+    if (( $(echo "$cpu_usage > $cpu_threshold" | bc -l) )); then
+        irf_log WARN "High CPU usage: ${cpu_usage}% (threshold: ${cpu_threshold}%)"
+        resource_state=1
+
+        # Apply CPU throttling
+        export IRF_CPU_THROTTLE=1
+        export IRF_BATCH_SIZE=$((IRF_BATCH_SIZE / 2))
+    elif [[ -n "${IRF_CPU_THROTTLE:-}" ]]; then
+        # Remove throttling if CPU usage returns to normal
+        unset IRF_CPU_THROTTLE
+        export IRF_BATCH_SIZE=${IRF_ORIGINAL_BATCH_SIZE:-1000}
+    fi
+
+    if (( $(echo "$mem_usage > $mem_threshold" | bc -l) )); then
+        irf_log WARN "High memory usage: ${mem_usage}% (threshold: ${mem_threshold}%)"
+        resource_state=1
+
+        # Apply memory optimization
+        export IRF_MEM_OPTIMIZE=1
+    elif [[ -n "${IRF_MEM_OPTIMIZE:-}" ]]; then
+        # Remove optimization if memory usage returns to normal
+        unset IRF_MEM_OPTIMIZE
+    fi
+
+    return $resource_state
+}
+
+#
+# Function: irf_init_cache
+# Description: Initialize the caching system
+# Arguments:
+#   $1 - Cache size (optional, default 1000)
+# Returns:
+#   0 if successful
+#
+irf_init_cache() {
+    local cache_size="${1:-1000}"
+
+    # Create cache directory
+    local cache_dir="${IRF_ROOT}/cache"
+    if [[ ! -d "$cache_dir" ]]; then
+        mkdir -p "$cache_dir"
+    fi
+
+    # Initialize cache variables
+    declare -A IRF_CACHE
+    declare -a IRF_CACHE_KEYS
+    export IRF_CACHE_SIZE=$cache_size
+    export IRF_CACHE_HITS=0
+    export IRF_CACHE_MISSES=0
+
+    irf_log DEBUG "Cache initialized with size: $cache_size"
+    return 0
+}
+
+#
+# Function: irf_cache_get
+# Description: Get a value from the cache
+# Arguments:
+#   $1 - Cache key
+# Returns:
+#   Cache value if found, empty string otherwise
+#   Sets IRF_CACHE_HIT=1 if found, IRF_CACHE_HIT=0 if not found
+#
+irf_cache_get() {
+    local key="$1"
+    local value="${IRF_CACHE[$key]:-}"
+
+    if [[ -n "$value" ]]; then
+        # Cache hit
+        IRF_CACHE_HIT=1
+        IRF_CACHE_HITS=$((IRF_CACHE_HITS + 1))
+
+        # Update access time
+        IRF_CACHE["${key}_time"]=$(date +%s)
+
+        echo "$value"
+    else
+        # Cache miss
+        IRF_CACHE_HIT=0
+        IRF_CACHE_MISSES=$((IRF_CACHE_MISSES + 1))
+        echo ""
+    fi
+}
+
+#
+# Function: irf_cache_set
+# Description: Set a value in the cache
+# Arguments:
+#   $1 - Cache key
+#   $2 - Cache value
+#   $3 - TTL in seconds (optional, default 3600)
+# Returns:
+#   0 if successful
+#
+irf_cache_set() {
+    local key="$1"
+    local value="$2"
+    local ttl="${3:-3600}"
+
+    # Get current cache size
+    local current_size=${#IRF_CACHE_KEYS[@]}
+
+    # If cache is full, remove least recently used item
+    if (( current_size >= IRF_CACHE_SIZE )); then
+        local oldest_key=""
+        local oldest_time=$(date +%s)
+
+        for k in "${IRF_CACHE_KEYS[@]}"; do
+            local access_time=${IRF_CACHE["${k}_time"]:-0}
+            if (( access_time < oldest_time )); then
+                oldest_time=$access_time
+                oldest_key=$k
+            fi
+        done
+
+        if [[ -n "$oldest_key" ]]; then
+            # Remove oldest entry
+            unset IRF_CACHE["$oldest_key"]
+            unset IRF_CACHE["${oldest_key}_time"]
+            unset IRF_CACHE["${oldest_key}_ttl"]
+
+            # Remove from keys array
+            local new_keys=()
+            for k in "${IRF_CACHE_KEYS[@]}"; do
+                if [[ "$k" != "$oldest_key" ]]; then
+                    new_keys+=("$k")
+                fi
+            done
+            IRF_CACHE_KEYS=("${new_keys[@]}")
+        fi
+    fi
+
+    # Store in cache
+    IRF_CACHE["$key"]="$value"
+    IRF_CACHE["${key}_time"]=$(date +%s)
+    IRF_CACHE["${key}_ttl"]=$ttl
+
+    # Add to keys if not already present
+    local key_exists=0
+    for k in "${IRF_CACHE_KEYS[@]}"; do
+        if [[ "$k" == "$key" ]]; then
+            key_exists=1
+            break
+        fi
+    done
+
+    if (( key_exists == 0 )); then
+        IRF_CACHE_KEYS+=("$key")
+    fi
+
+    return 0
+}
+
 # Initialize the framework environment
 irf_init() {
     # Check if already initialized

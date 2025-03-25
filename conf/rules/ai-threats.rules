@@ -1,0 +1,20 @@
+# AI-Powered Attack Detection Rules
+# Version: 1.0
+# Last updated: 2025-03-25
+# Format: RULE_ID;DESCRIPTION;PATTERN;SEVERITY;FIELDS
+
+# AI-Generated Phishing
+AI-PHISH-001;Unusually Sophisticated Phishing Content;spear.*phishing|targeted.*email|personalized.*attack;HIGH;9
+AI-PHISH-002;Deepfake Voice or Video Patterns;deepfake|voice.*clone|face.*synthesis;CRITICAL;9
+
+# Automated Reconnaissance
+AI-RECON-001;Automated Data Collection Pattern;rapid.*enumeration|sequential.*query|patterned.*scan;MEDIUM;9
+AI-RECON-002;AI-Enhanced Network Scanning;learning.*scan|adaptive.*probe|intelligent.*reconnaissance;HIGH;9
+
+# Malware Evasion
+AI-EVADE-001;Polymorphic Malware Indicators;auto.*mutation|dynamic.*obfuscation|adaptive.*evasion;HIGH;9
+AI-EVADE-002;Behavior-Based Sandbox Evasion;environment.*detection|virtualization.*check|sandbox.*evasion;HIGH;9
+
+# AI-Assisted Exploitation
+AI-EXPLOIT-001;Zero-Day Vulnerability Targeting;novel.*exploit|undisclosed.*vulnerability|adaptive.*payload;CRITICAL;9
+AI-EXPLOIT-002;Automated Exploit Generation;auto.*exploit|generated.*code|custom.*payload;HIGH;9

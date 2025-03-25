@@ -18,6 +18,9 @@ fi
 # Global array to store loaded rules
 declare -a IRF_LOADED_RULES=()
 
+# Global array to store context-aware rules
+declare -a IRF_CONTEXT_RULES=()
+
 # Rule severity levels
 declare -A IRF_SEVERITY_LEVELS
 IRF_SEVERITY_LEVELS=([INFO]=10 [LOW]=20 [MEDIUM]=30 [HIGH]=40 [CRITICAL]=50)
@@ -295,7 +298,7 @@ irf_index_rules() {
 # Arguments:
 #   $1 - Rule string
 # Returns:
-#   Sets global variables RULE_ID, RULE_DESCRIPTION, RULE_PATTERN, RULE_SEVERITY, RULE_FIELDS, RULE_TAGS
+#   Sets global variables RULE_ID, RULE_DESCRIPTION, RULE_PATTERN, RULE_SEVERITY, RULE_FIELDS, RULE_TAGS, RULE_NEGATIVE_PATTERN
 #
 irf_parse_rule() {
     local rule="$1"
@@ -307,9 +310,10 @@ irf_parse_rule() {
     RULE_SEVERITY="MEDIUM"  # Default severity
     RULE_FIELDS=""
     RULE_TAGS=""
+    RULE_NEGATIVE_PATTERN=""
     
-    # Expected format: ID;DESCRIPTION;PATTERN;SEVERITY;FIELDS;TAGS
-    IFS=';' read -r RULE_ID RULE_DESCRIPTION RULE_PATTERN RULE_SEVERITY RULE_FIELDS RULE_TAGS <<< "$rule"
+    # Expected format: ID;DESCRIPTION;PATTERN;SEVERITY;FIELDS;TAGS;NEGATIVE_PATTERN
+    IFS=';' read -r RULE_ID RULE_DESCRIPTION RULE_PATTERN RULE_SEVERITY RULE_FIELDS RULE_TAGS RULE_NEGATIVE_PATTERN <<< "$rule"
     
     # Validate required fields
     if [[ -z "$RULE_ID" || -z "$RULE_PATTERN" ]]; then
@@ -378,6 +382,110 @@ irf_apply_rule() {
             fi
         done
     fi
+    
+    return 1  # No match
+}
+
+#
+# Function: irf_apply_rule_with_negative
+# Description: Apply a detection rule with negative conditions
+# Arguments:
+#   $1 - Rule string
+#   $2 - Log line
+# Returns:
+#   0 if rule matched and negative conditions not matched, 1 otherwise
+#
+irf_apply_rule_with_negative() {
+    local rule="$1"
+    local log_line="$2"
+
+    # Parse the rule
+    if ! irf_parse_rule "$rule"; then
+        return 2
+    fi
+
+    # Check if there are negative patterns defined
+    if [[ -n "$RULE_NEGATIVE_PATTERN" ]]; then
+        # First check if positive pattern matches
+        if irf_apply_rule "$rule" "$log_line"; then
+            # Now check if negative pattern does NOT match
+            if [[ ! "$log_line" =~ $RULE_NEGATIVE_PATTERN ]]; then
+                return 0  # Match found and negative condition satisfied
+            fi
+        fi
+        return 1  # Either positive pattern didn't match or negative pattern matched
+    else
+        # No negative pattern, just use standard rule application
+        return $(irf_apply_rule "$rule" "$log_line")
+    fi
+}
+
+#
+# Function: irf_apply_context_rule
+# Description: Apply context-aware detection rule to a window of log entries
+# Arguments:
+#   $1 - Rule string
+#   $2 - Window file containing log entries
+# Returns:
+#   0 if rule matched, 1 if not matched, 2 if error
+#
+irf_apply_context_rule() {
+    local rule="$1"
+    local window_file="$2"
+    
+    # Parse the rule
+    if ! irf_parse_rule "$rule"; then
+        return 2
+    fi
+    
+    # Check for context patterns
+    case "$RULE_ID" in
+        *BRUTE_FORCE*)
+            # Count failed login attempts
+            local fail_count=$(grep -c "$RULE_PATTERN" "$window_file")
+            # Check negative pattern if present
+            if [[ -n "$RULE_NEGATIVE_PATTERN" ]]; then
+                # Exclude lines matching negative pattern
+                local neg_count=$(grep -E "$RULE_NEGATIVE_PATTERN" "$window_file" | grep -c "$RULE_PATTERN")
+                fail_count=$((fail_count - neg_count))
+            fi
+            if [[ $fail_count -ge 3 ]]; then
+                return 0  # Match found
+            fi
+            ;;
+        *RECON*)
+            # Check for diverse connection attempts
+            local unique_ips=$(grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' "$window_file" | sort -u | wc -l)
+            # If negative pattern exists, exclude IPs from lines matching it
+            if [[ -n "$RULE_NEGATIVE_PATTERN" ]]; then
+                local excluded_ips=$(grep -E "$RULE_NEGATIVE_PATTERN" "$window_file" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | sort -u | wc -l)
+                unique_ips=$((unique_ips - excluded_ips))
+            fi
+            if [[ $unique_ips -ge 5 ]]; then
+                return 0  # Match found
+            fi
+            ;;
+        *PRIVILEGE_ESCALATION*)
+            # Check for user followed by privilege escalation
+            if grep -q "user" "$window_file" && grep -q "sudo\|root" "$window_file"; then
+                # If negative pattern exists, make sure it doesn't match
+                if [[ -n "$RULE_NEGATIVE_PATTERN" && $(grep -c "$RULE_NEGATIVE_PATTERN" "$window_file") -gt 0 ]]; then
+                    return 1  # Negative pattern matched, not a true positive
+                fi
+                return 0  # Match found
+            fi
+            ;;
+        *)
+            # Apply custom pattern to all lines in the window
+            if grep -q "$RULE_PATTERN" "$window_file"; then
+                # If negative pattern exists, make sure it doesn't match any lines
+                if [[ -n "$RULE_NEGATIVE_PATTERN" && $(grep -c "$RULE_NEGATIVE_PATTERN" "$window_file") -gt 0 ]]; then
+                    return 1  # Negative pattern matched, not a true positive
+                fi
+                return 0  # Match found
+            fi
+            ;;
+    esac
     
     return 1  # No match
 }
@@ -515,6 +623,68 @@ irf_detect_threats() {
         irf_cleanup_temp_file "$temp_file"
     fi
     
+    return 0
+}
+
+#
+# Function: irf_detect_with_context
+# Description: Detect patterns that require context from multiple log entries
+# Arguments:
+#   $1 - Input log file (normalized format)
+#   $2 - Context window size (number of lines)
+#   $3 - Output alerts file (optional)
+# Returns:
+#   0 if successful, 1 otherwise
+#
+irf_detect_with_context() {
+    local input_file="$1"
+    local context_size="$2"
+    local output_file="${3:-}"
+    local temp_file=""
+
+    # Create temporary file if output file not specified
+    if [[ -z "$output_file" ]]; then
+        temp_file=$(irf_create_temp_file "irf_context_alerts")
+        output_file="$temp_file"
+    fi
+
+    # Create a sliding window of log lines
+    local window_file=$(irf_create_temp_file "irf_window")
+
+    # Initialize the window with the first N lines
+    head -n "$context_size" "$input_file" > "$window_file"
+
+    # Write header for alerts file
+    head -1 "$input_file" > "$output_file"
+
+    # Process each line with context
+    tail -n +2 "$input_file" | while IFS= read -r log_line; do
+        # Apply context-aware rules to the window
+        for rule in "${IRF_CONTEXT_RULES[@]}"; do
+            if irf_apply_context_rule "$rule" "$window_file"; then
+                # Match found - write alert using the trigger line (last line in window)
+                local trigger_line=$(tail -1 "$window_file")
+                echo -e "${RULE_ID}\t${RULE_SEVERITY}\t${RULE_DESCRIPTION}\t${trigger_line}" >> "$output_file"
+
+                # Log the alert
+                irf_log WARN "Context rule match: ${RULE_ID} - ${RULE_DESCRIPTION}"
+            fi
+        done
+
+        # Slide the window by removing first line and adding current line
+        sed -i '1d' "$window_file"
+        echo "$log_line" >> "$window_file"
+    done
+
+    # Clean up
+    irf_cleanup_temp_file "$window_file"
+
+    # If using a temp file, output the content and clean up
+    if [[ -n "$temp_file" ]]; then
+        cat "$temp_file"
+        irf_cleanup_temp_file "$temp_file"
+    fi
+
     return 0
 }
 

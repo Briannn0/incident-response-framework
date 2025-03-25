@@ -27,6 +27,17 @@ PROFILE_FILE="${IRF_EVIDENCE_DIR:-${IRF_ROOT}/evidence}/profiles/baseline_profil
 NEW_DATA=""
 FORMAT="tsv"
 OUTPUT_FILE=""
+# Time window related variables
+TIME_WINDOWS="hour,day,dayofweek"
+HOURLY_BINS="1"
+DAILY_BINS="1"
+WEEKLY_PATTERN="true"
+BUSINESS_HOURS="false"
+# Sensitivity related variables
+SENSITIVITY="medium"
+ADAPTIVE_THRESHOLD="true"
+MIN_CONFIDENCE="0.8"
+MAX_FP_RATE="0.05"
 
 # Display usage information
 show_usage() {
@@ -47,6 +58,19 @@ Options:
   --format FORMAT   Data format: csv, tsv, json (default: tsv)
   --output FILE     Path to output file for anomalies (default: auto-generated)
   --help            Display this help message
+
+Time Window Options (for create):
+  --time-windows LIST   Comma-separated list of time windows (default: hour,day,dayofweek)
+  --hourly-bins NUM     Hours per bin (default: 1)
+  --daily-bins NUM      Days per bin (default: 1)
+  --weekly-pattern BOOL Track day of week patterns (default: true)
+  --business-hours BOOL Special handling for business hours (default: false)
+
+Sensitivity Options (for detect):
+  --sensitivity LEVEL   Detection sensitivity: low, medium, high (default: medium)
+  --adaptive-threshold BOOL  Use adaptive thresholding (default: true)
+  --min-confidence NUM  Minimum confidence level 0-1 (default: 0.8)
+  --max-fp-rate NUM     Maximum false positive rate 0-1 (default: 0.05)
 EOF
 }
 
@@ -116,6 +140,105 @@ while [[ $# -gt 0 ]]; do
             fi
             ;;
             
+        --time-windows)
+            if [[ -n "$2" ]]; then
+                TIME_WINDOWS="$2"
+                shift 2
+            else
+                irf_log ERROR "Missing argument for --time-windows"
+                show_usage
+                exit 1
+            fi
+            ;;
+            
+        --hourly-bins)
+            if [[ -n "$2" ]]; then
+                HOURLY_BINS="$2"
+                shift 2
+            else
+                irf_log ERROR "Missing argument for --hourly-bins"
+                show_usage
+                exit 1
+            fi
+            ;;
+            
+        --daily-bins)
+            if [[ -n "$2" ]]; then
+                DAILY_BINS="$2"
+                shift 2
+            else
+                irf_log ERROR "Missing argument for --daily-bins"
+                show_usage
+                exit 1
+            fi
+            ;;
+            
+        --weekly-pattern)
+            if [[ -n "$2" ]]; then
+                WEEKLY_PATTERN="$2"
+                shift 2
+            else
+                irf_log ERROR "Missing argument for --weekly-pattern"
+                show_usage
+                exit 1
+            fi
+            ;;
+            
+        --business-hours)
+            if [[ -n "$2" ]]; then
+                BUSINESS_HOURS="$2"
+                shift 2
+            else
+                irf_log ERROR "Missing argument for --business-hours"
+                show_usage
+                exit 1
+            fi
+            ;;
+            
+        --sensitivity)
+            if [[ -n "$2" ]]; then
+                SENSITIVITY="$2"
+                shift 2
+            else
+                irf_log ERROR "Missing argument for --sensitivity"
+                show_usage
+                exit 1
+            fi
+            ;;
+            
+        --adaptive-threshold)
+            if [[ -n "$2" ]]; then
+                ADAPTIVE_THRESHOLD="$2"
+                shift 2
+            else
+                irf_log ERROR "Missing argument for --adaptive-threshold"
+                show_usage
+                exit 1
+            fi
+            ;;
+            
+        --min-confidence)
+            if [[ -n "$2" ]]; then
+                MIN_CONFIDENCE="$2"
+                shift 2
+            else
+                irf_log ERROR "Missing argument for --min-confidence"
+                show_usage
+                exit 1
+            fi
+            ;;
+            
+        --max-fp-rate)
+            if [[ -n "$2" ]]; then
+                MAX_FP_RATE="$2"
+                shift 2
+            else
+                irf_log ERROR "Missing argument for --max-fp-rate"
+                show_usage
+                exit 1
+            fi
+            ;;
+            
         --help)
             show_usage
             exit 0
@@ -151,12 +274,17 @@ case "$ACTION" in
             exit 1
         fi
         
-        # Run the Python baseline profiler
+        # Run the Python baseline profiler with time window options
         python3 "${IRF_ROOT}/lib/python/baseline.py" \
             --action create \
             --data "$TRAINING_DATA" \
             --format "$FORMAT" \
-            --output "$PROFILE_FILE" || {
+            --output "$PROFILE_FILE" \
+            --time-windows "$TIME_WINDOWS" \
+            --hourly-bins "$HOURLY_BINS" \
+            --daily-bins "$DAILY_BINS" \
+            --weekly-pattern "$WEEKLY_PATTERN" \
+            --business-hours "$BUSINESS_HOURS" || {
             irf_log ERROR "Baseline profile creation failed"
             exit 1
         }
@@ -180,20 +308,42 @@ case "$ACTION" in
         if [[ ! -f "$NEW_DATA" ]]; then
             irf_log ERROR "New data file does not exist: $NEW_DATA"
             exit 1
-        }
+        fi
         
         # Set default output file if not specified
         if [[ -z "$OUTPUT_FILE" ]]; then
             OUTPUT_FILE="${IRF_EVIDENCE_DIR:-${IRF_ROOT}/evidence}/analysis/anomalies_$(date +%Y%m%d_%H%M%S).json"
         fi
         
-        # Run the Python baseline profiler
+        # Map sensitivity to Z-score thresholds
+        case "$SENSITIVITY" in
+            low)
+                Z_THRESHOLD="4.0"  # Very conservative
+                ;;
+            medium)
+                Z_THRESHOLD="3.0"  # Standard
+                ;;
+            high)
+                Z_THRESHOLD="2.5"  # More sensitive
+                ;;
+            *)
+                irf_log ERROR "Invalid sensitivity: $SENSITIVITY"
+                show_usage
+                exit 1
+                ;;
+        esac
+        
+        # Run the Python baseline profiler with sensitivity options
         python3 "${IRF_ROOT}/lib/python/baseline.py" \
             --action detect \
             --profile "$PROFILE_FILE" \
             --data "$NEW_DATA" \
             --format "$FORMAT" \
-            --output "$OUTPUT_FILE" || {
+            --output "$OUTPUT_FILE" \
+            --z-threshold "$Z_THRESHOLD" \
+            --adaptive-threshold "$ADAPTIVE_THRESHOLD" \
+            --min-confidence "$MIN_CONFIDENCE" \
+            --max-fp-rate "$MAX_FP_RATE" || {
             irf_log ERROR "Anomaly detection failed"
             exit 1
         }

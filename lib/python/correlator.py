@@ -378,6 +378,174 @@ class EventCorrelator:
             
         return correlated_chains
     
+    def correlate_multi_stage_attack(self):
+        """Identify sophisticated multi-stage attack patterns across different log sources."""
+        if not self.events:
+            return []
+
+        # Convert to pandas DataFrame
+        df = pd.DataFrame(self.events)
+
+        # Ensure timestamp is datetime
+        if 'timestamp' in df.columns:
+            df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
+            df = df.sort_values('timestamp')
+
+        # Define multi-stage attack patterns
+        attack_patterns = [
+            {
+                'name': 'Reconnaissance to Exploitation to Persistence',
+                'stages': [
+                    {'category': 'reconnaissance', 'rules': ['UA-.*', 'BF-SSH-.*'], 'min_count': 3},
+                    {'category': 'exploitation', 'rules': ['PE-.*'], 'min_count': 1},
+                    {'category': 'persistence', 'rules': ['MW-PERS-.*'], 'min_count': 1}
+                ],
+                'max_time_gap': 3600,  # 1 hour between stages
+                'conditions': ['same_ip_address', 'same_username'],
+                'severity': 'CRITICAL'
+            },
+            {
+                'name': 'Data Exfiltration Campaign',
+                'stages': [
+                    {'category': 'access', 'rules': ['UA-.*'], 'min_count': 1},
+                    {'category': 'internal_recon', 'rules': ['UA-FILE-.*'], 'min_count': 2},
+                    {'category': 'exfiltration', 'rules': ['DE-.*'], 'min_count': 1}
+                ],
+                'max_time_gap': 7200,  # 2 hours between stages
+                'conditions': ['same_ip_address'],
+                'severity': 'HIGH'
+            }
+        ]
+
+        # Find matches for each attack pattern
+        multi_stage_attacks = []
+
+        for pattern in attack_patterns:
+            # Group by conditions if specified
+            groupby_columns = []
+            if 'same_ip_address' in pattern.get('conditions', []) and 'ip_address' in df.columns:
+                groupby_columns.append('ip_address')
+            if 'same_username' in pattern.get('conditions', []) and 'username' in df.columns:
+                groupby_columns.append('username')
+
+            # If no groupby columns, analyze all events together
+            if not groupby_columns:
+                matches = self._find_attack_stages(df, pattern)
+                multi_stage_attacks.extend(matches)
+            else:
+                # Group events by specified columns
+                for name, group in df.groupby(groupby_columns):
+                    matches = self._find_attack_stages(group, pattern)
+                    multi_stage_attacks.extend(matches)
+
+        return multi_stage_attacks
+
+    def _find_attack_stages(self, events_df, pattern):
+        """Find events matching each stage of a multi-stage attack pattern."""
+        matches = []
+        stages_matched = []
+
+        # Check each stage
+        for stage in pattern['stages']:
+            stage_events = []
+
+            # Find events matching any rule pattern for this stage
+            for rule_pattern in stage['rules']:
+                matching_events = events_df[events_df['RULE_ID'].str.match(rule_pattern)]
+                stage_events.extend(matching_events.to_dict('records'))
+
+            # Check if we found enough events for this stage
+            if len(stage_events) >= stage.get('min_count', 1):
+                stages_matched.append({
+                    'category': stage['category'],
+                    'events': stage_events
+                })
+
+        # If all stages matched, check time constraints
+        if len(stages_matched) == len(pattern['stages']):
+            # Check if stages occurred in the expected order and within time constraints
+            valid_sequence = True
+            for i in range(1, len(stages_matched)):
+                prev_time = max(pd.to_datetime(event['timestamp']) for event in stages_matched[i-1]['events'])
+                curr_time = min(pd.to_datetime(event['timestamp']) for event in stages_matched[i]['events'])
+
+                # Check if time gap between stages is too large
+                if (curr_time - prev_time).total_seconds() > pattern.get('max_time_gap', float('inf')):
+                    valid_sequence = False
+                    break
+
+            if valid_sequence:
+                # Create a match record
+                all_events = []
+                for stage in stages_matched:
+                    all_events.extend(stage['events'])
+
+                # Sort by timestamp
+                all_events.sort(key=lambda x: pd.to_datetime(x['timestamp']))
+
+                matches.append({
+                    'correlation_type': 'multi_stage_attack',
+                    'attack_pattern': pattern['name'],
+                    'event_count': len(all_events),
+                    'events': all_events,
+                    'start_time': all_events[0]['timestamp'],
+                    'end_time': all_events[-1]['timestamp'],
+                    'severity': pattern.get('severity', 'HIGH')
+                })
+
+        return matches
+    
+    def analyze_attack_velocity(self):
+        """Analyze the velocity of attacks to identify coordinated campaigns."""
+        if not self.events:
+            return []
+
+        # Convert to pandas DataFrame
+        df = pd.DataFrame(self.events)
+
+        # Ensure timestamp is datetime
+        if 'timestamp' in df.columns:
+            df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
+            df = df.sort_values('timestamp')
+
+            # Calculate time differences between consecutive events
+            df['time_diff'] = df['timestamp'].diff().dt.total_seconds()
+
+            # Group by rule type to analyze patterns
+            velocity_patterns = []
+
+            # Extract rule categories (first 2-3 chars of rule ID)
+            if 'RULE_ID' in df.columns:
+                df['rule_category'] = df['RULE_ID'].str.extract(r'^([A-Z]{2,3})-')
+
+                # Group by rule category
+                for category, group in df.groupby('rule_category'):
+                    if len(group) < 5:  # Skip if too few events
+                        continue
+
+                    # Calculate statistics
+                    mean_interval = group['time_diff'].mean()
+                    std_interval = group['time_diff'].std()
+                    min_interval = group['time_diff'].min()
+
+                    # Check for unusually regular patterns (potential automation)
+                    if std_interval < mean_interval * 0.2 and len(group) > 10:
+                        velocity_patterns.append({
+                            'correlation_type': 'attack_velocity',
+                            'category': category,
+                            'event_count': len(group),
+                            'mean_interval': float(mean_interval),
+                            'std_interval': float(std_interval),
+                            'min_interval': float(min_interval),
+                            'start_time': str(group['timestamp'].min()),
+                            'end_time': str(group['timestamp'].max()),
+                            'events': group.to_dict('records'),
+                            'severity': 'HIGH' if min_interval < 1.0 else 'MEDIUM'
+                        })
+
+            return velocity_patterns
+        return []
+    
     def save_checkpoint(self, checkpoint_id=None):
         """Save the current state for recovery.
         
@@ -516,10 +684,14 @@ class EventCorrelator:
         ip_correlations = self.correlate_by_ip()
         time_correlations = self.correlate_by_time_window()
         chain_correlations = self.correlate_by_attack_chain()
+        multi_stage_correlations = self.correlate_multi_stage_attack()
+        velocity_correlations = self.analyze_attack_velocity()
         
         correlations.extend(ip_correlations)
         correlations.extend(time_correlations)
         correlations.extend(chain_correlations)
+        correlations.extend(multi_stage_correlations)
+        correlations.extend(velocity_correlations)
         
         # Save to file if specified
         if output_file and correlations:

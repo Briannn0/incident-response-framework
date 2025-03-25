@@ -1,0 +1,21 @@
+# Supply Chain Attack Detection Rules
+# Version: 1.0
+# Last updated: 2025-03-25
+# Format: RULE_ID;DESCRIPTION;PATTERN;SEVERITY;FIELDS
+
+# Package and Repository Attacks
+SC-PKG-001;Suspicious Package Installation;npm install|pip install|gem install|nuget;MEDIUM;9
+SC-PKG-002;Suspicious Repository Addition;apt.*add|repo add|source.*list;HIGH;9
+SC-PKG-003;Package Repository Credentials Access;\.npmrc|pip\.conf|\.gem;HIGH;9
+
+# Software Update Tampering
+SC-UPD-001;Unusual Update Behavior;update.*modified|patch.*infected|installer.*tampered;HIGH;9
+SC-UPD-002;Software Update from Unusual Source;update.*from.*unknown|non-standard.*domain|irregular.*cdn;HIGH;9
+
+# Code Injection in Dependencies
+SC-DEP-001;Suspicious Code in Dependencies;obfuscated.*code|unexpected.*function|hidden.*payload;HIGH;9
+SC-DEP-002;Third-Party Library Modification;library.*modified|unexpected.*change|hash.*mismatch;CRITICAL;9
+
+# CI/CD Pipeline Compromise
+SC-CICD-001;Build System Credential Theft;jenkins.*token|github.*action.*secret|gitlab.*ci;CRITICAL;9
+SC-CICD-002;Pipeline Configuration Change;pipeline.*modified|workflow.*altered|build.*process.*changed;HIGH;9

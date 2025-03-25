@@ -1,0 +1,26 @@
+# Living Off The Land (LOTL) Attack Detection Rules
+# Version: 1.0
+# Last updated: 2025-03-25
+# Format: RULE_ID;DESCRIPTION;PATTERN;SEVERITY;FIELDS
+
+# PowerShell Abuse
+LOTL-PS-001;PowerShell Encoded Command Execution;powershell.*-e|-enc|-encodedcommand;HIGH;9
+LOTL-PS-002;PowerShell Script Download and Execute;powershell.*downloadstring|iex|invoke-expression;HIGH;9
+LOTL-PS-003;PowerShell AMSI Bypass Attempt;bypass|reflection.assembly;CRITICAL;9
+
+# Windows Management Instrumentation (WMI)
+LOTL-WMI-001;WMI Process Creation;wmic.*process call create;HIGH;9
+LOTL-WMI-002;WMI Remote Command Execution;wmic /node;HIGH;9
+
+# Built-in Windows Utilities
+LOTL-CMD-001;BITSAdmin Suspicious Download;bitsadmin.*transfer;HIGH;9
+LOTL-CMD-002;Certutil Used as Downloader;certutil.*-urlcache|-decode;HIGH;9
+LOTL-CMD-003;Scheduled Task Creation for Persistence;schtasks.*create;MEDIUM;9
+
+# Credential Access
+LOTL-CRED-001;Mimikatz-like Command Line;sekurlsa::logonpasswords|sekurlsa::wdigest|lsadump;CRITICAL;9
+LOTL-CRED-002;LSASS Memory Access;procdump.*lsass|tasklist.*lsass;HIGH;9
+
+# Remote Service Execution
+LOTL-SVC-001;PSExec-like Execution;psexec|wmic.*node|xcommand;HIGH;9
+LOTL-SVC-002;Service Installation/Modification;sc.*create|config;MEDIUM;9
